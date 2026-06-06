@@ -1,0 +1,142 @@
+"""
+Red Team FastAPI Application Entry Point
+=========================================
+Wires all routers, auth middleware, health endpoint, and rate limiting.
+
+Endpoints:
+  POST /red-team/ingest         — ingest fraud signals (rate limited: 500/min)
+  GET  /red-team/report/{id}    — full evasion analysis for an ingest
+  GET  /red-team/evasions       — paginated evasion KB listing
+  GET  /health                  — service health check (no auth)
+"""
+
+from __future__ import annotations
+
+import asyncio
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
+from app.api import briefing as briefing_router
+from app.api import evasions as evasions_router
+from app.api import ingest as ingest_router
+from app.api import report as report_router
+from app.config import get_settings
+from app.utils.audit_logger import configure_logging, get_logger
+from app.utils.limiter import limiter
+from app.worker.pipeline import worker_loop
+
+log = get_logger(__name__)
+
+
+# limiter is imported from app.utils.limiter — see that module for docs.
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Lifespan
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application startup and shutdown events."""
+    configure_logging()
+    settings = get_settings()
+    log.info(
+        "red_team_starting",
+        env=settings.app_env,
+        shadow_url=settings.blue_team_shadow_url,
+    )
+
+    # Start the background worker pipeline
+    worker_task = asyncio.create_task(worker_loop(), name="red_team_worker")
+    log.info("worker_task_started")
+
+    yield
+
+    # Graceful shutdown: cancel the worker and wait for it to finish
+    worker_task.cancel()
+    try:
+        await worker_task
+    except asyncio.CancelledError:
+        pass
+    log.info("red_team_shutting_down")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FastAPI app
+# ─────────────────────────────────────────────────────────────────────────────
+
+app = FastAPI(
+    title="BLING Red Team API",
+    description=(
+        "Adversarial simulation engine for BLING forensic fraud detection. "
+        "Receives confirmed fraud signals from Blue Team, mutates them to find "
+        "detection blind spots, and proposes patches. "
+        "**Output is developer intelligence only — never automated blocking.**"
+    ),
+    version="0.1.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    lifespan=lifespan,
+)
+
+# ── State (required by slowapi) ───────────────────────────────────────────────
+app.state.limiter = limiter
+
+# ── Exception handlers ────────────────────────────────────────────────────────
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# ── Middleware ─────────────────────────────────────────────────────────────────
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],   # tighten in production
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Routers
+# ─────────────────────────────────────────────────────────────────────────────
+
+app.include_router(ingest_router.router)
+app.include_router(report_router.router)
+app.include_router(evasions_router.router)
+app.include_router(briefing_router.router)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Health endpoint (no auth — used by Docker healthcheck and load balancers)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@app.get(
+    "/health",
+    tags=["health"],
+    summary="Service health check",
+    include_in_schema=True,
+)
+async def health() -> dict[str, str]:
+    """Returns service liveness. No authentication required."""
+    return {"status": "ok", "service": "red-team"}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Entry point for uvicorn
+# ─────────────────────────────────────────────────────────────────────────────
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=8001,
+        reload=True,
+        log_level="info",
+    )

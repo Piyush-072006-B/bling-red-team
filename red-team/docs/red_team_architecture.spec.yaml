@@ -1,0 +1,154 @@
+meta:
+  theme: tech-blue
+  source: generated
+  layout: hierarchical
+  canvas: auto
+  routing: orthogonal
+  title: BLING Red Team — Adversarial Simulation Engine
+  description: >
+    End-to-end flow from Blue Team fraud signals through Red Team engines, sandbox evaluation, knowledge base, and patch
+    proposals back to Blue Team / TGEP.
+modules:
+  - id: ingest_layer
+    label: Ingest Layer
+  - id: processing_layer
+    label: Processing Layer
+  - id: output_layer
+    label: Output Layer
+nodes:
+  - id: fraud_dna
+    label: Fraud DNA
+    type: document
+    module: ingest_layer
+  - id: novelty
+    label: Novelty Escalation
+    type: document
+    module: ingest_layer
+  - id: gate_miss
+    label: Gate Miss Log
+    type: document
+    module: ingest_layer
+  - id: ingest_router
+    label: Ingest Router
+    type: service
+    module: ingest_layer
+    size: large
+  - id: archetype_extractor
+    label: Archetype Extractor
+    type: process
+    module: processing_layer
+  - id: mutation_engine
+    label: Mutation Engine
+    type: process
+    module: processing_layer
+  - id: graph_adversary
+    label: Graph Adversary
+    type: process
+    module: processing_layer
+  - id: shadow_scorer
+    label: Shadow Scorer
+    type: service
+    module: processing_layer
+  - id: evaluators
+    label: Evaluators
+    type: process
+    module: processing_layer
+  - id: evasion_kb
+    label: Evasion KB
+    type: database
+    module: processing_layer
+  - id: gate_patch
+    label: Gate Patch Proposal
+    type: document
+    module: output_layer
+  - id: new_archetype_spec
+    label: New Archetype Spec
+    type: document
+    module: output_layer
+  - id: red_team_report
+    label: Red Team Report
+    type: document
+    module: output_layer
+  - id: tgep
+    label: TGEP Webhook
+    type: cloud
+    module: output_layer
+  - id: blue_team_dev
+    label: Blue Team Developers
+    type: user
+    module: output_layer
+edges:
+  - from: fraud_dna
+    to: ingest_router
+    type: primary
+    label: X-API-Key
+  - from: novelty
+    to: ingest_router
+    type: primary
+    label: X-API-Key
+  - from: gate_miss
+    to: ingest_router
+    type: primary
+    label: X-API-Key
+  - from: ingest_router
+    to: archetype_extractor
+    type: primary
+    label: HIGH/CRITICAL
+  - from: ingest_router
+    to: mutation_engine
+    type: primary
+    label: FRAUD_DNA
+  - from: ingest_router
+    to: graph_adversary
+    type: primary
+    label: GATE_MISS
+  - from: archetype_extractor
+    to: shadow_scorer
+    type: data
+    label: mutated vectors
+  - from: mutation_engine
+    to: shadow_scorer
+    type: data
+    label: 10 mutations
+  - from: graph_adversary
+    to: shadow_scorer
+    type: data
+    label: 5 bypass graphs
+  - from: shadow_scorer
+    to: evaluators
+    type: primary
+    label: score + gate
+  - from: evaluators
+    to: evasion_kb
+    type: data
+    label: append record
+  - from: evasion_kb
+    to: gate_patch
+    type: primary
+    label: severity HIGH
+  - from: evasion_kb
+    to: new_archetype_spec
+    type: primary
+    label: is_novel=True
+  - from: evasion_kb
+    to: red_team_report
+    type: primary
+    label: all evasions
+  - from: red_team_report
+    to: tgep
+    type: data
+    label: webhook
+    style:
+      dashed: true
+  - from: gate_patch
+    to: blue_team_dev
+    type: optional
+    label: developer action
+    style:
+      dashed: true
+  - from: new_archetype_spec
+    to: blue_team_dev
+    type: optional
+    label: developer action
+    style:
+      dashed: true

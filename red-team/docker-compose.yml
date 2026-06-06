@@ -1,0 +1,45 @@
+version: "3.9"
+
+# Red Team Infrastructure — PostgreSQL + Redis only
+# Ports intentionally differ from Blue Team to allow simultaneous operation:
+#   Blue Team: PostgreSQL=5432, Redis=6379
+#   Red Team:  PostgreSQL=5433, Redis=6380
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: red_team_postgres
+    environment:
+      POSTGRES_USER: redteam
+      POSTGRES_PASSWORD: redteam
+      POSTGRES_DB: redteam
+    ports:
+      - "5433:5432"
+    volumes:
+      - red_team_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U redteam -d redteam"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: red_team_redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - red_team_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  red_team_pg_data:
+    driver: local
+  red_team_redis_data:
+    driver: local

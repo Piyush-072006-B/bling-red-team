@@ -1,0 +1,242 @@
+{
+  "version": 1,
+  "title": "BLING Red Team — Adversarial Simulation Engine",
+  "type": "module-diagram",
+  "source": "generated",
+  "profile": "default",
+  "theme": "tech-blue",
+  "layout": "hierarchical",
+  "counts": {
+    "nodes": 15,
+    "edges": 17,
+    "modules": 3
+  },
+  "nodes": [
+    {
+      "id": "fraud_dna",
+      "label": "Fraud DNA",
+      "type": "document",
+      "module": "ingest_layer"
+    },
+    {
+      "id": "novelty",
+      "label": "Novelty Escalation",
+      "type": "document",
+      "module": "ingest_layer"
+    },
+    {
+      "id": "gate_miss",
+      "label": "Gate Miss Log",
+      "type": "document",
+      "module": "ingest_layer"
+    },
+    {
+      "id": "ingest_router",
+      "label": "Ingest Router",
+      "type": "service",
+      "module": "ingest_layer",
+      "size": "large"
+    },
+    {
+      "id": "archetype_extractor",
+      "label": "Archetype Extractor",
+      "type": "process",
+      "module": "processing_layer"
+    },
+    {
+      "id": "mutation_engine",
+      "label": "Mutation Engine",
+      "type": "process",
+      "module": "processing_layer"
+    },
+    {
+      "id": "graph_adversary",
+      "label": "Graph Adversary",
+      "type": "process",
+      "module": "processing_layer"
+    },
+    {
+      "id": "shadow_scorer",
+      "label": "Shadow Scorer",
+      "type": "service",
+      "module": "processing_layer"
+    },
+    {
+      "id": "evaluators",
+      "label": "Evaluators",
+      "type": "process",
+      "module": "processing_layer"
+    },
+    {
+      "id": "evasion_kb",
+      "label": "Evasion KB",
+      "type": "database",
+      "module": "processing_layer"
+    },
+    {
+      "id": "gate_patch",
+      "label": "Gate Patch Proposal",
+      "type": "document",
+      "module": "output_layer"
+    },
+    {
+      "id": "new_archetype_spec",
+      "label": "New Archetype Spec",
+      "type": "document",
+      "module": "output_layer"
+    },
+    {
+      "id": "red_team_report",
+      "label": "Red Team Report",
+      "type": "document",
+      "module": "output_layer"
+    },
+    {
+      "id": "tgep",
+      "label": "TGEP Webhook",
+      "type": "cloud",
+      "module": "output_layer"
+    },
+    {
+      "id": "blue_team_dev",
+      "label": "Blue Team Developers",
+      "type": "user",
+      "module": "output_layer"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1",
+      "from": "fraud_dna",
+      "to": "ingest_router",
+      "type": "primary",
+      "label": "X-API-Key"
+    },
+    {
+      "id": "edge-2",
+      "from": "novelty",
+      "to": "ingest_router",
+      "type": "primary",
+      "label": "X-API-Key"
+    },
+    {
+      "id": "edge-3",
+      "from": "gate_miss",
+      "to": "ingest_router",
+      "type": "primary",
+      "label": "X-API-Key"
+    },
+    {
+      "id": "edge-4",
+      "from": "ingest_router",
+      "to": "archetype_extractor",
+      "type": "primary",
+      "label": "HIGH/CRITICAL"
+    },
+    {
+      "id": "edge-5",
+      "from": "ingest_router",
+      "to": "mutation_engine",
+      "type": "primary",
+      "label": "FRAUD_DNA"
+    },
+    {
+      "id": "edge-6",
+      "from": "ingest_router",
+      "to": "graph_adversary",
+      "type": "primary",
+      "label": "GATE_MISS"
+    },
+    {
+      "id": "edge-7",
+      "from": "archetype_extractor",
+      "to": "shadow_scorer",
+      "type": "data",
+      "label": "mutated vectors"
+    },
+    {
+      "id": "edge-8",
+      "from": "mutation_engine",
+      "to": "shadow_scorer",
+      "type": "data",
+      "label": "10 mutations"
+    },
+    {
+      "id": "edge-9",
+      "from": "graph_adversary",
+      "to": "shadow_scorer",
+      "type": "data",
+      "label": "5 bypass graphs"
+    },
+    {
+      "id": "edge-10",
+      "from": "shadow_scorer",
+      "to": "evaluators",
+      "type": "primary",
+      "label": "score + gate"
+    },
+    {
+      "id": "edge-11",
+      "from": "evaluators",
+      "to": "evasion_kb",
+      "type": "data",
+      "label": "append record"
+    },
+    {
+      "id": "edge-12",
+      "from": "evasion_kb",
+      "to": "gate_patch",
+      "type": "primary",
+      "label": "severity HIGH"
+    },
+    {
+      "id": "edge-13",
+      "from": "evasion_kb",
+      "to": "new_archetype_spec",
+      "type": "primary",
+      "label": "is_novel=True"
+    },
+    {
+      "id": "edge-14",
+      "from": "evasion_kb",
+      "to": "red_team_report",
+      "type": "primary",
+      "label": "all evasions"
+    },
+    {
+      "id": "edge-15",
+      "from": "red_team_report",
+      "to": "tgep",
+      "type": "data",
+      "label": "webhook"
+    },
+    {
+      "id": "edge-16",
+      "from": "gate_patch",
+      "to": "blue_team_dev",
+      "type": "optional",
+      "label": "developer action"
+    },
+    {
+      "id": "edge-17",
+      "from": "new_archetype_spec",
+      "to": "blue_team_dev",
+      "type": "optional",
+      "label": "developer action"
+    }
+  ],
+  "modules": [
+    {
+      "id": "ingest_layer",
+      "label": "Ingest Layer"
+    },
+    {
+      "id": "processing_layer",
+      "label": "Processing Layer"
+    },
+    {
+      "id": "output_layer",
+      "label": "Output Layer"
+    }
+  ]
+}
