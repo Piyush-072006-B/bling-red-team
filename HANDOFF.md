@@ -2,7 +2,7 @@
 
 ## STATUS
 PHASE: DEPLOYMENT_PENDING
-LAST_COMPLETED_TASK: Create .gitignore file in red-team directory
+LAST_COMPLETED_TASK: Copy red-team/README.md to project root (D:\bling-red-team\README.md)
 NEXT_TASK: Deploy Red Team to Railway (3 steps: push to GitHub, create Railway project, set env vars). Do NOT wire Blue Team or TGEP yet.
 BLOCKING_ISSUE: none
 TESTS_PASSING: 124/124
@@ -152,5 +152,6 @@ TGEP_WEBHOOK_CONNECTED: no — wiring deferred
 - Added `mutation_intelligence` to `GET /red-team/briefing` so it produces structural analysis (top features, multipliers tested, plain English recs) even when shadow scorer is offline (all severities LOW).
 - Renamed the 'accepted' bucket to 'structural_findings' in `GET /red-team/briefing` to better reflect that these are real patterns requiring review when the shadow scorer is offline.
 - Created `.gitignore` in `red-team/` to exclude `venv/`, `.env`, `__pycache__/`, `*.pyc`, `.pytest_cache/`, `*.egg-info/`, `dist/`, `.eggs/`, `htmlcov/`, and `.coverage`.
+- Copied `red-team/README.md` to `D:\bling-red-team\README.md` (project root) to ensure the documentation is immediately visible at the top level of the repository.
 - When returning: type "continue" → agent reads this file → starts Railway deployment
 - GOLDEN INVARIANT PRESERVED: Red Team output is developer intelligence, not automated blocking.
