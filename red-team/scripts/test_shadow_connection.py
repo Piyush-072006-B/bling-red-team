@@ -5,7 +5,7 @@ One-shot connectivity test: sends a known structuring transaction to the
 Blue Team shadow scorer and asserts score > 0.5.
 
 Usage:
-    python scripts/test_shadow_connection.py [--url http://localhost:8001]
+    python scripts/test_shadow_connection.py [--url http://localhost:8002]
 
 Requirements for Blue Team:
     1. Blue Team must expose POST /api/v1/shadow/score
@@ -20,7 +20,7 @@ Requirements for Blue Team:
            - bling_network  (shared with Red Team)
 
     3. Blue Team .env must have:
-         RED_TEAM_URL=http://red-team:8001
+         RED_TEAM_URL=http://red-team:8002
          RED_TEAM_API_KEY=changeme
 
 Exits 0 on success (score > 0.5), 1 on failure or unavailability.
@@ -173,8 +173,8 @@ def main() -> int:
     )
     parser.add_argument(
         "--url",
-        default="http://localhost:8001",
-        help="Blue Team shadow scorer base URL (default: http://localhost:8001, i.e. BLUE_TEAM_SHADOW_URL)",
+        default="http://localhost:8002",
+        help="Blue Team shadow scorer base URL (default: http://localhost:8002, i.e. BLUE_TEAM_SHADOW_URL)",
     )
     parser.add_argument(
         "--internal-key",

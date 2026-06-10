@@ -86,6 +86,7 @@ async def score_transaction(
                 headers={
                     "Content-Type": "application/json",
                     "X-Caller": "red-team-sandbox",
+                    "X-API-Key": settings.blue_team_shadow_api_key,
                 },
             )
             response.raise_for_status()

@@ -89,7 +89,7 @@ def mock_tgep():
     with patch(
         "app.worker.pipeline.maybe_fire_tgep_for_report",
         new_callable=AsyncMock,
-        return_value=True,
+        return_value={},
     ) as mock:
         yield mock
 

@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     )
 
     # ── Blue Team integration ──────────────────────────────────────
+    blue_team_shadow_api_key: str = Field(
+        default="",
+        description="Used as X-API-Key when calling Blue Team shadow scorer",
+    )
     blue_team_shadow_url: str = Field(
         default="",
         description=(
@@ -50,7 +54,7 @@ class Settings(BaseSettings):
 
     # ── TGEP webhook ──────────────────────────────────────────────
     tgep_webhook_url: str = Field(
-        default="http://localhost:9000/webhook",
+        default="http://localhost:9000/api/red-team/evaluate",
         description="TGEP endpoint for patch proposal webhooks",
     )
 

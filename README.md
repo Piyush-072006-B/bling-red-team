@@ -204,7 +204,7 @@ Rate limit: `500/minute` on `POST /red-team/ingest`.
 - **No auth required**
 - **Returns**: `{"status": "ok", "service": "red-team"}`
 
-Interactive docs: http://localhost:8001/docs
+Interactive docs: http://localhost:8002/docs
 
 ---
 
@@ -308,7 +308,7 @@ alembic upgrade head
 
 **Step 5 — Start server:**
 ```bash
-uvicorn app.main:app --reload --port 8001
+uvicorn app.main:app --reload --port 8002
 ```
 
 *OR use the convenience scripts from project root:*
@@ -318,8 +318,8 @@ Double-click stop.ps1    # stops everything cleanly
 ```
 
 **Step 6 — Verify:**
-- Open http://localhost:8001/health
-- Open http://localhost:8001/docs  ← interactive API explorer
+- Open http://localhost:8002/health
+- Open http://localhost:8002/docs  ← interactive API explorer
 
 **Step 7 — Run tests:**
 ```bash
@@ -391,7 +391,7 @@ Three tables:
   `id, report_type (GATE_PATCH|NEW_ARCHETYPE|CONTEXT_ABUSE), payload jsonb, recommended_action (PATCH|MONITOR|ACCEPT), tgep_webhook_sent bool, created_at`
 
 **Ports (no conflicts with Blue Team):**
-- Red Team API: 8001 | Blue Team API: 8000
+- Red Team API: 8002 | Blue Team API: 8000
 - Red Team PostgreSQL: 5433 | Blue Team PostgreSQL: 5432
 - Red Team Redis: 6380 | Blue Team Redis: 6379
 
@@ -440,7 +440,7 @@ async def notify_red_team(fraud_dna: dict):
 
 Add to Blue Team `.env`:
 ```env
-RED_TEAM_URL=http://red-team:8001
+RED_TEAM_URL=http://red-team:8002
 RED_TEAM_API_KEY=changeme
 ```
 

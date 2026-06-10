@@ -68,13 +68,13 @@ async def fire_tgep_webhook(
     severity: str,
     recommended_action: str = "PATCH",
     created_at: str | None = None,
-) -> bool:
+) -> dict[str, Any] | None:
     """
     POST an evasion-confirmed event to the TGEP webhook endpoint.
     Only fires when severity is HIGH or CRITICAL.
 
     Retry policy: one retry on network/timeout failure.
-    Returns True if webhook was accepted (2xx), False otherwise.
+    Returns parsed JSON if webhook was accepted (2xx), None otherwise.
     All failures are logged and never re-raised (non-blocking).
     """
     if severity not in _WEBHOOK_SEVERITY_THRESHOLD:
@@ -83,7 +83,7 @@ async def fire_tgep_webhook(
             severity=severity,
             report_id=report_id,
         )
-        return False
+        return None
 
     settings = get_settings()
     webhook_url = settings.tgep_webhook_url
@@ -123,7 +123,7 @@ async def fire_tgep_webhook(
                         status_code=resp.status_code,
                         attempt=attempt,
                     )
-                    return True
+                    return resp.json()
                 else:
                     log.warning(
                         "tgep_webhook_rejected",
@@ -133,7 +133,7 @@ async def fire_tgep_webhook(
                         body=resp.text[:200],
                     )
                     if attempt == 2:
-                        return False
+                        return None
                     # Fall through to retry
 
         except httpx.TimeoutException as exc:
@@ -144,7 +144,7 @@ async def fire_tgep_webhook(
                 detail=str(exc),
             )
             if attempt == 2:
-                return False
+                return None
 
         except httpx.RequestError as exc:
             log.warning(
@@ -154,7 +154,7 @@ async def fire_tgep_webhook(
                 detail=str(exc),
             )
             if attempt == 2:
-                return False
+                return None
 
         except Exception as exc:
             log.error(
@@ -163,12 +163,12 @@ async def fire_tgep_webhook(
                 attempt=attempt,
                 detail=str(exc),
             )
-            return False
+            return None
 
-    return False
+    return None
 
 
-async def maybe_fire_tgep_for_report(report: dict[str, Any]) -> bool:
+async def maybe_fire_tgep_for_report(report: dict[str, Any]) -> dict[str, Any] | None:
     """
     Convenience wrapper: fire TGEP webhook if the report warrants it.
 
@@ -177,14 +177,14 @@ async def maybe_fire_tgep_for_report(report: dict[str, Any]) -> bool:
                 id, report_type, payload, recommended_action, severity, created_at
 
     Returns:
-        True if webhook was sent successfully, False otherwise.
+        Parsed JSON if webhook was sent successfully, None otherwise.
     """
     severity = report.get("severity") or "LOW"
     recommended_action = report.get("recommended_action", "ACCEPT")
 
     # Only fire for PATCH recommendations at HIGH/CRITICAL severity
     if recommended_action != "PATCH" or severity not in _WEBHOOK_SEVERITY_THRESHOLD:
-        return False
+        return None
 
     payload_data: dict = report.get("payload", {})
     archetype = payload_data.get("archetype", "UNKNOWN")

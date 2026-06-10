@@ -230,7 +230,11 @@ async def _pipeline_fraud_dna(ingest_id: str, payload: Any) -> None:
 
     # Fire TGEP webhook — only fires for HIGH/CRITICAL + recommended_action=PATCH
     report = _build_report_for_tgep(ingest_id, archetype, evasion_ids)
-    await maybe_fire_tgep_for_report(report)
+    tgep_result = await maybe_fire_tgep_for_report(report)
+    if tgep_result:
+        from app.knowledge.kb_store import update_evasion_tgep_result
+        for e_id in evasion_ids:
+            update_evasion_tgep_result(e_id, tgep_result)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

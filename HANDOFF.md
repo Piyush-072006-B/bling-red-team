@@ -2,10 +2,10 @@
 
 ## STATUS
 PHASE: DEPLOYMENT_PENDING
-LAST_COMPLETED_TASK: Copy red-team/README.md to project root (D:\bling-red-team\README.md)
+LAST_COMPLETED_TASK: Added 6 compound mutations to mutation_engine.py to simulate sophisticated multi-feature attacks
 NEXT_TASK: Deploy Red Team to Railway (3 steps: push to GitHub, create Railway project, set env vars). Do NOT wire Blue Team or TGEP yet.
 BLOCKING_ISSUE: none
-TESTS_PASSING: 124/124
+TESTS_PASSING: 129/129
 DEPLOYMENT_STATUS: PROTOTYPE — single process, in-memory stores, data lost on restart. Persistence deferred post-hackathon.
 
 ## COMPLETED_TASKS
@@ -67,8 +67,8 @@ DEPLOYMENT_STATUS: PROTOTYPE — single process, in-memory stores, data lost on 
 - [DONE] Issue 8 — HANDOFF + README updated with PROTOTYPE status, 124/124 test count, in-memory known blocker
 
 ### Phase 9 — Local Convenience Scripts
-- [DONE] Task 9.1 — start.ps1 (docker-compose up -d, 5s wait, activate venv, uvicorn :8001, open /docs in browser)
-- [DONE] Task 9.2 — stop.ps1 (kill port 8001, docker-compose down, print clean stop)
+- [DONE] Task 9.1 — start.ps1 (docker-compose up -d, 5s wait, activate venv, uvicorn :8002, open /docs in browser)
+- [DONE] Task 9.2 — stop.ps1 (kill port 8002, docker-compose down, print clean stop)
 
 ## IN_PROGRESS
 (none)
@@ -117,15 +117,15 @@ TGEP_WEBHOOK_CONNECTED: no — wiring deferred
 ## NOTES
 - Project root: d:\bling-red-team
 - Red Team files: d:\bling-red-team\red-team\
-- Local server tested and working on port 8001
-- All 124 tests pass (124/124). Service is production-ready for Railway deployment.
+- Local server tested and working on port 8002
+- All 129 tests pass (129/129). Service is production-ready for Railway deployment.
 - DEPLOYMENT_STATUS: PROTOTYPE — single process, in-memory stores, data lost on restart.
 - KNOWN BLOCKER (post-hackathon): Postgres/Redis persistence not yet wired — all data ephemeral.
 - 3 TGEP test results saved: digital_arrest=HIGH, 9hop_cycle=CRITICAL, bipartite=HIGH
 - 3 patch proposals identified: cycle gate 9+ hops, senior+night secondary trigger, bipartite threshold 0.55
 - Shadow scorer returns null (expected — Blue Team not local)
 - Archetype showing NEW_VARIANT (expected — sparse feature vector, only 26/59 features sent)
-- Ports: Red Team API=8001, PostgreSQL=5433, Redis=6380
+- Ports: Red Team API=8002, PostgreSQL=5433, Redis=6380
 - DB in v1 uses in-memory stores. Postgres wiring is the next natural step (Phase 3 extension).
 - slowapi rate limit: 500/min on POST /red-team/ingest
 - Do not run docker-compose down — containers can stay running
@@ -146,8 +146,8 @@ TGEP_WEBHOOK_CONNECTED: no — wiring deferred
 - Issue 6: blue_team_shadow_url default=""; shadow_scorer.py short-circuits if unconfigured.
 - Issue 7: Contract tests for TGEP webhook (20 tests in test_tgep_contracts.py).
 - Issue 8: HANDOFF + README updated with PROTOTYPE status, 124/124 count.
-- start.ps1: docker-compose up -d → 5s wait → venv activate → uvicorn :8001 → opens /docs
-- stop.ps1: kills port 8001 → docker-compose down → prints "Red Team stopped cleanly"
+- start.ps1: docker-compose up -d → 5s wait → venv activate → uvicorn :8002 → opens /docs
+- stop.ps1: kills port 8002 → docker-compose down → prints "Red Team stopped cleanly"
 - Fixed PydanticUndefinedAnnotation: removed `from __future__ import annotations` from app/api/ingest.py (deferred annotations broke Pydantic discriminated-union resolution at startup)
 - Added `mutation_intelligence` to `GET /red-team/briefing` so it produces structural analysis (top features, multipliers tested, plain English recs) even when shadow scorer is offline (all severities LOW).
 - Renamed the 'accepted' bucket to 'structural_findings' in `GET /red-team/briefing` to better reflect that these are real patterns requiring review when the shadow scorer is offline.
@@ -155,3 +155,6 @@ TGEP_WEBHOOK_CONNECTED: no — wiring deferred
 - Copied `red-team/README.md` to `D:\bling-red-team\README.md` (project root) to ensure the documentation is immediately visible at the top level of the repository.
 - When returning: type "continue" → agent reads this file → starts Railway deployment
 - GOLDEN INVARIANT PRESERVED: Red Team output is developer intelligence, not automated blocking.
+- Added context management, mutation strength, and skill activation rules to red-team/AGENTS.md
+- Applied updated architecture proposal: port changed to 8002, BLUE_TEAM_SHADOW_API_KEY added, TGEP bidirectional webhook integrated with KB fields.
+- Added 6 compound mutations to simulate sophisticated attackers (daytime_slowdown, structuring_ghost, festival_layering, mule_warmup, kyc_ghost, senior_festival_night).

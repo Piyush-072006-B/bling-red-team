@@ -153,6 +153,9 @@ def append_evasion(evasion_data: dict[str, Any]) -> str:
         "gate_probe_result": evasion_data.get("gate_probe_result"),
         "feature_sensitivity_result": evasion_data.get("feature_sensitivity_result"),
         "context_bypass_result": evasion_data.get("context_bypass_result"),
+        "tgep_threat_level": evasion_data.get("tgep_threat_level"),
+        "tgep_patterns_detected": evasion_data.get("tgep_patterns_detected"),
+        "tgep_recommended_patch": evasion_data.get("tgep_recommended_patch"),
         "created_at": now,
     }
 
@@ -173,6 +176,15 @@ def append_evasion(evasion_data: dict[str, Any]) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 # Query
 # ─────────────────────────────────────────────────────────────────────────────
+
+
+def update_evasion_tgep_result(row_id: str, tgep_result: dict[str, Any]) -> None:
+    """Update an existing evasion record with TGEP evaluation results."""
+    row = get_evasion_by_id(row_id)
+    if row:
+        row["tgep_threat_level"] = tgep_result.get("threat_level")
+        row["tgep_patterns_detected"] = tgep_result.get("patterns_detected")
+        row["tgep_recommended_patch"] = tgep_result.get("recommended_patch")
 
 
 def query_evasions(

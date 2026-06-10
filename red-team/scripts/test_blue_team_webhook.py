@@ -5,7 +5,7 @@ End-to-end test: simulates Blue Team sending a confirmed fraud signal
 (FRAUD_DNA) to Red Team's POST /red-team/ingest endpoint.
 
 Run with:
-    python scripts/test_blue_team_webhook.py [--url http://localhost:8001]
+    python scripts/test_blue_team_webhook.py [--url http://localhost:8002]
 
 Exits 0 on success, 1 on failure.
 This script is for developer testing — not part of the pytest suite.
@@ -154,8 +154,8 @@ def main() -> int:
     )
     parser.add_argument(
         "--url",
-        default="http://localhost:8001",
-        help="Red Team base URL (default: http://localhost:8001)",
+        default="http://localhost:8002",
+        help="Red Team base URL (default: http://localhost:8002)",
     )
     parser.add_argument(
         "--api-key",
@@ -173,7 +173,7 @@ def main() -> int:
     if not check_health(args.url):
         print(
             "\n⚠️  Red Team service not reachable. "
-            "Start it with: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload"
+            "Start it with: uvicorn app.main:app --host 0.0.0.0 --port 8002 --reload"
         )
         print("   (Tests are written — run this script once the service is up.)")
         return 0  # Not a test failure — service not running

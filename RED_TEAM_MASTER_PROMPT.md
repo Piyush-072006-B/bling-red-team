@@ -131,7 +131,7 @@ Create the exact file structure above. Every file gets a stub (docstring + TODO)
 Create `.env.example`:
 ```
 RED_TEAM_API_KEY=changeme
-BLUE_TEAM_SHADOW_URL=http://localhost:8001          # Blue Team shadow scorer
+BLUE_TEAM_SHADOW_URL=http://localhost:8002          # Blue Team shadow scorer
 BLUE_TEAM_INGEST_URL=http://localhost:8000/api/v1   # Blue Team main API
 TGEP_WEBHOOK_URL=http://localhost:9000/webhook
 POSTGRES_URL=postgresql://redteam:redteam@localhost:5433/redteam
@@ -359,7 +359,7 @@ async def notify_red_team(fraud_dna: dict):
 
 Add to Blue Team `.env`:
 ```
-RED_TEAM_URL=http://red-team:8001
+RED_TEAM_URL=http://red-team:8002
 RED_TEAM_API_KEY=changeme
 ```
 
@@ -425,7 +425,7 @@ TGEP should create a ticket or alert from this. If TGEP has a webhook receiver e
 
 | Service | Port |
 |---------|------|
-| Red Team API | 8001 |
+| Red Team API | 8002 |
 | Red Team PostgreSQL | 5433 |
 | Red Team Redis | 6380 |
 | Blue Team API | 8000 |

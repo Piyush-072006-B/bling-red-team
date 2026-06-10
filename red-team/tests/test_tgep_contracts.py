@@ -169,7 +169,7 @@ class TestMaybeFirTgepContract:
         with patch(
             "app.api.tgep_webhook.fire_tgep_webhook",
             new_callable=AsyncMock,
-            return_value=True,
+            return_value={},
         ) as mock_fire:
             result = await maybe_fire_tgep_for_report(report)
             mock_fire.assert_called_once()
@@ -216,7 +216,7 @@ class TestMaybeFirTgepContract:
         ) as mock_fire:
             result = await maybe_fire_tgep_for_report(report)
             mock_fire.assert_not_called()
-            assert result is False
+            assert result is None
 
     @pytest.mark.asyncio
     async def test_does_not_fire_for_low(self):
@@ -236,7 +236,7 @@ class TestMaybeFirTgepContract:
         ) as mock_fire:
             result = await maybe_fire_tgep_for_report(report)
             mock_fire.assert_not_called()
-            assert result is False
+            assert result is None
 
     @pytest.mark.asyncio
     async def test_does_not_fire_when_accept_action(self):
@@ -256,7 +256,7 @@ class TestMaybeFirTgepContract:
         ) as mock_fire:
             result = await maybe_fire_tgep_for_report(report)
             mock_fire.assert_not_called()
-            assert result is False
+            assert result is None
 
     @pytest.mark.asyncio
     async def test_fire_tgep_skips_low_severity_directly(self):
@@ -271,7 +271,7 @@ class TestMaybeFirTgepContract:
                 severity="LOW",
                 recommended_action="ACCEPT",
             )
-            assert result is False
+            assert result is None
             mock_client.assert_not_called()
 
     @pytest.mark.asyncio
@@ -287,5 +287,5 @@ class TestMaybeFirTgepContract:
                 severity="MEDIUM",
                 recommended_action="MONITOR",
             )
-            assert result is False
+            assert result is None
             mock_client.assert_not_called()

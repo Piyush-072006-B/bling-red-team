@@ -34,10 +34,10 @@ if (-Not (Test-Path $VenvActivate)) {
 & $VenvActivate
 
 # ── Step 4: Start uvicorn ────────────────────────────────────────────────────
-Write-Host "[4/4] Starting uvicorn on http://localhost:8001 ..." -ForegroundColor Yellow
+Write-Host "[4/4] Starting uvicorn on http://localhost:8002 ..." -ForegroundColor Yellow
 Write-Host ""
-Write-Host "  Docs: http://localhost:8001/docs" -ForegroundColor Green
-Write-Host "  Health: http://localhost:8001/health" -ForegroundColor Green
+Write-Host "  Docs: http://localhost:8002/docs" -ForegroundColor Green
+Write-Host "  Health: http://localhost:8002/health" -ForegroundColor Green
 Write-Host ""
 Write-Host "  Press Ctrl+C to stop uvicorn (then run .\stop.ps1 to tear down Docker)" -ForegroundColor DarkGray
 Write-Host ""
@@ -45,9 +45,9 @@ Write-Host ""
 # Open docs in browser after a short delay (background job)
 Start-Job -ScriptBlock {
     Start-Sleep -Seconds 3
-    Start-Process "http://localhost:8001/docs"
+    Start-Process "http://localhost:8002/docs"
 } | Out-Null
 
 # Start uvicorn (blocking — runs in foreground so Ctrl+C works naturally)
 Set-Location $RedTeamDir
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8002 --reload

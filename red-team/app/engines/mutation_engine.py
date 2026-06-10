@@ -96,7 +96,7 @@ def _apply_delta(
     delta: dict[str, float] = {}
     for k, new_val in overrides.items():
         old_val = base.get(k, 0.0)
-        clamped = _clamp(new_val)
+        clamped = new_val if new_val > 1.0 else _clamp(new_val)
         mutated[k] = clamped
         if abs(clamped - old_val) > 1e-9:
             delta[k] = round(clamped - old_val, 6)
@@ -182,6 +182,72 @@ def _novelty_zero_mutation(original: dict[str, float]) -> dict[str, Any] | None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Compound Mutations
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _compound_daytime_slowdown(original: dict[str, float]) -> dict[str, Any] | None:
+    overrides = {
+        "night_txn_ratio": 0.10,
+        "hour_deviation": 0.0,
+        "burst_score": original.get("burst_score", 1.0) * 0.7,
+        "velocity_ratio": original.get("velocity_ratio", 1.0) * 0.7,
+        "channel_entropy": 0.3,
+    }
+    return _build_mutation("compound_daytime_slowdown", original, overrides)
+
+
+def _compound_structuring_ghost(original: dict[str, float]) -> dict[str, Any] | None:
+    overrides = {
+        "amount_series_score": original.get("amount_series_score", 1.0) * 0.88,
+        "amount_vs_threshold_50000": original.get("amount_vs_threshold_50000", 1.0) * 0.88,
+        "counterparty_novelty": 0.0,
+        "txn_count_30d": 3.0,
+    }
+    return _build_mutation("compound_structuring_ghost", original, overrides)
+
+
+def _compound_festival_layering(original: dict[str, float]) -> dict[str, Any] | None:
+    overrides = {
+        "is_festival_period": 1.0,
+        "velocity_ratio": original.get("velocity_ratio", 1.0) * 0.75,
+        "burst_score": original.get("burst_score", 1.0) * 0.75,
+        "night_txn_ratio": 0.1,
+    }
+    return _build_mutation("compound_festival_layering", original, overrides)
+
+
+def _compound_mule_warmup(original: dict[str, float]) -> dict[str, Any] | None:
+    overrides = {
+        "dormancy_reactivation_flag": 0.0,
+        "txn_count_30d": 12.0,
+        "avg_txn_amount_30d": 15000.0,
+        "burst_score": original.get("burst_score", 1.0) * 0.6,
+    }
+    return _build_mutation("compound_mule_warmup", original, overrides)
+
+
+def _compound_kyc_ghost(original: dict[str, float]) -> dict[str, Any] | None:
+    overrides = {
+        "kyc_completeness_score": 0.9,
+        "counterparty_novelty": 0.0,
+        "geography_switch": 0.0,
+        "channel_switch": 0.0,
+    }
+    return _build_mutation("compound_kyc_ghost", original, overrides)
+
+
+def _compound_senior_festival_night(original: dict[str, float]) -> dict[str, Any] | None:
+    overrides = {
+        "night_txn_ratio": 0.0,
+        "is_festival_period": 1.0,
+        "payee_vpa_age_days": 30.0,
+        "amount_zscore": 1.5,
+    }
+    return _build_mutation("compound_senior_festival_night", original, overrides)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Public API
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -189,7 +255,7 @@ def _novelty_zero_mutation(original: dict[str, float]) -> dict[str, Any] | None:
 def generate_mutations(
     feature_vector: dict[str, float],
     archetype: str,
-    n: int = 10,
+    n: int = 16,
 ) -> list[dict[str, Any]]:
     """
     Generate up to N mutations of a feature vector designed to evade Blue Team scoring.
@@ -197,7 +263,7 @@ def generate_mutations(
     Args:
         feature_vector: The original 59-feature vector.
         archetype:      Confirmed archetype label (used for targeted mutation selection).
-        n:              Number of mutations to return (default 10).
+        n:              Number of mutations to return (default 16).
 
     Returns:
         List of up to N mutation dicts, each containing:
@@ -224,6 +290,18 @@ def generate_mutations(
         _threshold_mutation(feature_vector, _THRESHOLD_FEATURES_1M, "threshold_amount_1m"),
         # 10. Velocity 30%
         _velocity_mutation(feature_vector, 0.30, "velocity_30pct"),
+        # 11. Compound Daytime Slowdown
+        _compound_daytime_slowdown(feature_vector),
+        # 12. Compound Structuring Ghost
+        _compound_structuring_ghost(feature_vector),
+        # 13. Compound Festival Layering
+        _compound_festival_layering(feature_vector),
+        # 14. Compound Mule Warmup
+        _compound_mule_warmup(feature_vector),
+        # 15. Compound KYC Ghost
+        _compound_kyc_ghost(feature_vector),
+        # 16. Compound Senior Festival Night
+        _compound_senior_festival_night(feature_vector),
     ]
 
     mutations = [m for m in candidates if m is not None]

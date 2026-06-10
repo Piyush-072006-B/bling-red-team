@@ -30,9 +30,32 @@ Every output is a proposal for a human to act on.
 ## Ports
 | Service              | Port |
 |----------------------|------|
-| Red Team API         | 8001 |
+| Red Team API         | 8002 |
 | Red Team PostgreSQL  | 5433 |
 | Red Team Redis       | 6380 |
 | Blue Team API        | 8000 |
 | Blue Team PostgreSQL | 5432 |
 | Blue Team Redis      | 6379 |
+
+## CONTEXT MANAGEMENT RULES
+1. Before writing any new code, read the existing file first
+2. Before adding any import, check if it already exists in the file
+3. Before creating any new function, search for similar functions in the codebase
+4. Maximum function length: 40 lines. If longer, split it
+5. Maximum file length: 200 lines. If longer, flag it for refactoring
+6. After every task, summarize what changed and why in HANDOFF.md
+7. Never duplicate logic that exists elsewhere — find and import it instead
+
+## MUTATION STRENGTH RULES
+8. Single-feature mutations are weak. Every archetype must have at least 
+   2 compound mutations changing 3+ features simultaneously
+9. Compound mutations must be realistic — features a real attacker would 
+   change together, not random combinations
+10. Compound mutation naming: prefix with compound_ 
+
+## SKILL ACTIVATION HINTS
+- For any mutation or ML work: use machine-learning-ops-ml-pipeline 
+  and data-scientist skills
+- For any cleanup or refactor: use code-refactoring-refactor-clean 
+  and clean-code skills
+- For context restore at session start: use code-refactoring-context-restore

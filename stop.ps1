@@ -10,10 +10,10 @@ Write-Host "  BLING Red Team — Stopping local stack" -ForegroundColor Cyan
 Write-Host "==================================================" -ForegroundColor Cyan
 Write-Host ""
 
-# ── Step 1: Kill any process listening on port 8001 (uvicorn) ───────────────
-Write-Host "[1/2] Stopping uvicorn on port 8001..." -ForegroundColor Yellow
+# ── Step 1: Kill any process listening on port 8002 (uvicorn) ───────────────
+Write-Host "[1/2] Stopping uvicorn on port 8002..." -ForegroundColor Yellow
 
-$procs = netstat -ano | Select-String ":8001 " | ForEach-Object {
+$procs = netstat -ano | Select-String ":8002 " | ForEach-Object {
     ($_ -split "\s+")[-1]
 } | Sort-Object -Unique | Where-Object { $_ -match "^\d+$" }
 
@@ -28,7 +28,7 @@ if ($procs) {
     Start-Sleep -Milliseconds 500
     Write-Host "  uvicorn stopped." -ForegroundColor Green
 } else {
-    Write-Host "  No process found on port 8001 (already stopped)." -ForegroundColor DarkGray
+    Write-Host "  No process found on port 8002 (already stopped)." -ForegroundColor DarkGray
 }
 
 # ── Step 2: Stop Docker containers ──────────────────────────────────────────
