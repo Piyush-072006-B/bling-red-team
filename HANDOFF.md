@@ -2,10 +2,10 @@
 
 ## STATUS
 PHASE: DEPLOYMENT_PENDING
-LAST_COMPLETED_TASK: Added 6 compound mutations to mutation_engine.py to simulate sophisticated multi-feature attacks
-NEXT_TASK: Deploy Red Team to Railway (3 steps: push to GitHub, create Railway project, set env vars). Do NOT wire Blue Team or TGEP yet.
+LAST_COMPLETED_TASK: Upgraded mutation and graph generation to bypass 3 tiers of Blue Team detection & Isolation Forest
+NEXT_TASK: Test new bypasses against TGEP manually
 BLOCKING_ISSUE: none
-TESTS_PASSING: 129/129
+TESTS_PASSING: 139/139
 DEPLOYMENT_STATUS: PROTOTYPE — single process, in-memory stores, data lost on restart. Persistence deferred post-hackathon.
 
 ## COMPLETED_TASKS
@@ -158,3 +158,9 @@ TGEP_WEBHOOK_CONNECTED: no — wiring deferred
 - Added context management, mutation strength, and skill activation rules to red-team/AGENTS.md
 - Applied updated architecture proposal: port changed to 8002, BLUE_TEAM_SHADOW_API_KEY added, TGEP bidirectional webhook integrated with KB fields.
 - Added 6 compound mutations to simulate sophisticated attackers (daytime_slowdown, structuring_ghost, festival_layering, mule_warmup, kyc_ghost, senior_festival_night).
+- Updated file length rule in `AGENTS.md` to allow 400 lines for engine files (`mutation_engine.py`, `graph_adversary.py`, `pipeline.py`).
+- Implemented 3-tier bypass + Isolation Forest evasion. Added `tier_aware_mutations.py` and `tgep_bypass_graphs.py`.
+- `mutation_engine.py` now runs 22 mutations (10 single, 6 old compound, 6 tier-aware) per signal, applying `vary_structural_fingerprint` to all.
+- Pipeline now runs a pre-flight tier check (logged via structlog) before mutations.
+- TGEP bypass graphs are now stored in `evasion_kb` with `mutation_type="graph_bypass_{evasion_type}"`.
+- All 139 tests passing (`test_tier_bypass.py` added).

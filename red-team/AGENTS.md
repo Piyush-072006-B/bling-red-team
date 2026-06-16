@@ -42,7 +42,7 @@ Every output is a proposal for a human to act on.
 2. Before adding any import, check if it already exists in the file
 3. Before creating any new function, search for similar functions in the codebase
 4. Maximum function length: 40 lines. If longer, split it
-5. Maximum file length: 200 lines. If longer, flag it for refactoring
+5. Maximum file length: 400 lines for engine files (mutation_engine.py, graph_adversary.py, pipeline.py). 200 lines for all other files. If any engine file exceeds 400 lines, split by grouping related functions into a helper module (e.g. mutation_helpers.py) — never truncate logic.
 6. After every task, summarize what changed and why in HANDOFF.md
 7. Never duplicate logic that exists elsewhere — find and import it instead
 

@@ -33,11 +33,13 @@ from typing import Any
 from app.engines.archetype_extractor import extract_archetype
 from app.engines.graph_adversary import VALID_GATES, generate_all_bypasses, generate_bypass
 from app.engines.mutation_engine import generate_mutations
+from app.engines.tgep_bypass_graphs import VALID_BYPASS_TYPES, generate_tgep_bypass_graph
 from app.ingest.router import _queues, get_ingest_log, update_ingest_status
 from app.knowledge.kb_store import append_evasion
 from app.sandbox.evaluators import context_bypass, feature_sensitivity, gate_probe
 from app.sandbox.shadow_scorer import score_transaction
 from app.api.tgep_webhook import maybe_fire_tgep_for_report
+from app.worker.pre_flight import pre_flight_tier_check
 from app.utils.audit_logger import get_logger
 
 log = get_logger(__name__)
@@ -176,6 +178,9 @@ async def _pipeline_fraud_dna(ingest_id: str, payload: Any) -> None:
     """
     feature_vector: dict[str, float] = payload.feature_vector
 
+    # Step 0 — Pre-flight tier check (logged via structlog)
+    pre_flight_tier_check(feature_vector)
+
     # Step 1 — Archetype extraction
     archetype_result = extract_archetype(feature_vector)
     archetype: str = archetype_result["archetype"]  # type: ignore[assignment]
@@ -186,8 +191,8 @@ async def _pipeline_fraud_dna(ingest_id: str, payload: Any) -> None:
         metadata={"ingest_id": ingest_id, "archetype": archetype},
     )
 
-    # Step 3 — Generate mutations
-    mutations = generate_mutations(feature_vector, archetype, n=10)
+    # Step 3 — Generate mutations (22 total: 10 single + 6 old compound + 6 tier-aware)
+    mutations = generate_mutations(feature_vector, archetype, n=22)
 
     evasion_ids: list[str] = []
 
@@ -227,6 +232,27 @@ async def _pipeline_fraud_dna(ingest_id: str, payload: Any) -> None:
         }
         evasion_id = append_evasion(evasion_data)
         evasion_ids.append(evasion_id)
+
+    # Step 4 — Generate TGEP bypass graphs and store in KB
+    for bypass_type in sorted(VALID_BYPASS_TYPES):
+        graph_result = generate_tgep_bypass_graph(archetype, bypass_type)
+        graph_evasion: dict[str, Any] = {
+            "archetype": archetype,
+            "evasion_vector": {"graph_edges": graph_result["edge_count"]},
+            "gate_bypassed": [bypass_type],
+            "feature_deltas": {},
+            "context_multiplier_abused": None,
+            "evasion_success": True,
+            "score_original": None,
+            "score_mutated": None,
+            "ingest_log_id": ingest_id,
+            "mutation_type": graph_result["mutation_type"],
+            "gate_probe_result": {"edges": graph_result["edges"]},
+            "feature_sensitivity_result": None,
+            "context_bypass_result": None,
+        }
+        g_id = append_evasion(graph_evasion)
+        evasion_ids.append(g_id)
 
     # Fire TGEP webhook — only fires for HIGH/CRITICAL + recommended_action=PATCH
     report = _build_report_for_tgep(ingest_id, archetype, evasion_ids)

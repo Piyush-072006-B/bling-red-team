@@ -103,7 +103,7 @@ def _apply_delta(
     return mutated, delta
 
 
-def _build_mutation(
+def build_mutation(
     mutation_type: str,
     original: dict[str, float],
     overrides: dict[str, float],
@@ -140,7 +140,7 @@ def _threshold_mutation(
     if not overrides:
         # Feature not present — set to a low value
         overrides = {k: 0.85 * _THRESHOLD_EVASION_FACTOR for k in features}
-    return _build_mutation(label, original, overrides)
+    return build_mutation(label, original, overrides)
 
 
 def _velocity_mutation(
@@ -154,31 +154,31 @@ def _velocity_mutation(
         k: original.get(k, 1.0) * factor
         for k in _VELOCITY_FEATURES
     }
-    return _build_mutation(label, original, overrides)
+    return build_mutation(label, original, overrides)
 
 
 def _timing_mutation(original: dict[str, float]) -> dict[str, Any] | None:
     """Push timing features toward daytime pattern."""
     overrides = {k: v for k, v in _TIMING_FEATURES.items()}
-    return _build_mutation("timing_day", original, overrides)
+    return build_mutation("timing_day", original, overrides)
 
 
 def _context_festival_mutation(original: dict[str, float]) -> dict[str, Any] | None:
     """Flip is_festival_period to 1 to exploit 0.70 multiplier in Blue Team."""
     overrides = {_FESTIVAL_FEATURE: 1.0}
-    return _build_mutation("context_festival", original, overrides)
+    return build_mutation("context_festival", original, overrides)
 
 
 def _context_senior_mutation(original: dict[str, float]) -> dict[str, Any] | None:
     """Remove night flag — mimics senior-account exemption in Blue Team context logic."""
     overrides = {_SENIOR_NIGHT_FEATURE: 0.0}
-    return _build_mutation("context_senior", original, overrides)
+    return build_mutation("context_senior", original, overrides)
 
 
 def _novelty_zero_mutation(original: dict[str, float]) -> dict[str, Any] | None:
     """Set counterparty_novelty=0 — pretend payee is a known counterparty."""
     overrides = {_NOVELTY_FEATURE: 0.0}
-    return _build_mutation("novelty_zero", original, overrides)
+    return build_mutation("novelty_zero", original, overrides)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -194,7 +194,7 @@ def _compound_daytime_slowdown(original: dict[str, float]) -> dict[str, Any] | N
         "velocity_ratio": original.get("velocity_ratio", 1.0) * 0.7,
         "channel_entropy": 0.3,
     }
-    return _build_mutation("compound_daytime_slowdown", original, overrides)
+    return build_mutation("compound_daytime_slowdown", original, overrides)
 
 
 def _compound_structuring_ghost(original: dict[str, float]) -> dict[str, Any] | None:
@@ -204,7 +204,7 @@ def _compound_structuring_ghost(original: dict[str, float]) -> dict[str, Any] | 
         "counterparty_novelty": 0.0,
         "txn_count_30d": 3.0,
     }
-    return _build_mutation("compound_structuring_ghost", original, overrides)
+    return build_mutation("compound_structuring_ghost", original, overrides)
 
 
 def _compound_festival_layering(original: dict[str, float]) -> dict[str, Any] | None:
@@ -214,7 +214,7 @@ def _compound_festival_layering(original: dict[str, float]) -> dict[str, Any] | 
         "burst_score": original.get("burst_score", 1.0) * 0.75,
         "night_txn_ratio": 0.1,
     }
-    return _build_mutation("compound_festival_layering", original, overrides)
+    return build_mutation("compound_festival_layering", original, overrides)
 
 
 def _compound_mule_warmup(original: dict[str, float]) -> dict[str, Any] | None:
@@ -224,7 +224,7 @@ def _compound_mule_warmup(original: dict[str, float]) -> dict[str, Any] | None:
         "avg_txn_amount_30d": 15000.0,
         "burst_score": original.get("burst_score", 1.0) * 0.6,
     }
-    return _build_mutation("compound_mule_warmup", original, overrides)
+    return build_mutation("compound_mule_warmup", original, overrides)
 
 
 def _compound_kyc_ghost(original: dict[str, float]) -> dict[str, Any] | None:
@@ -234,7 +234,7 @@ def _compound_kyc_ghost(original: dict[str, float]) -> dict[str, Any] | None:
         "geography_switch": 0.0,
         "channel_switch": 0.0,
     }
-    return _build_mutation("compound_kyc_ghost", original, overrides)
+    return build_mutation("compound_kyc_ghost", original, overrides)
 
 
 def _compound_senior_festival_night(original: dict[str, float]) -> dict[str, Any] | None:
@@ -244,7 +244,7 @@ def _compound_senior_festival_night(original: dict[str, float]) -> dict[str, Any
         "payee_vpa_age_days": 30.0,
         "amount_zscore": 1.5,
     }
-    return _build_mutation("compound_senior_festival_night", original, overrides)
+    return build_mutation("compound_senior_festival_night", original, overrides)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -255,7 +255,7 @@ def _compound_senior_festival_night(original: dict[str, float]) -> dict[str, Any
 def generate_mutations(
     feature_vector: dict[str, float],
     archetype: str,
-    n: int = 16,
+    n: int = 22,
 ) -> list[dict[str, Any]]:
     """
     Generate up to N mutations of a feature vector designed to evade Blue Team scoring.
@@ -263,12 +263,15 @@ def generate_mutations(
     Args:
         feature_vector: The original 59-feature vector.
         archetype:      Confirmed archetype label (used for targeted mutation selection).
-        n:              Number of mutations to return (default 16).
+        n:              Number of mutations to return (default 22).
 
     Returns:
         List of up to N mutation dicts, each containing:
             mutation_id, mutation_type, delta_features, original_vector, mutated_vector
     """
+    from app.engines.tier_aware_mutations import generate_tier_aware_mutations
+    from app.engines.fingerprint_vary import vary_structural_fingerprint
+
     candidates: list[dict[str, Any] | None] = [
         # 1. Threshold — 50k
         _threshold_mutation(feature_vector, _THRESHOLD_FEATURES_50K, "threshold_amount_50k"),
@@ -304,12 +307,19 @@ def generate_mutations(
         _compound_senior_festival_night(feature_vector),
     ]
 
+    # 17-22. Tier-aware compound mutations
+    candidates.extend(generate_tier_aware_mutations(feature_vector))
+
     mutations = [m for m in candidates if m is not None]
 
     # If an archetype has a specialised first-priority mutation, move it to front
     _prioritise_for_archetype(mutations, archetype)
 
     result = mutations[:n]
+
+    # Apply Isolation Forest fingerprint variance to every mutation
+    for m in result:
+        vary_structural_fingerprint(m["mutated_vector"])
 
     log.info(
         "mutations_generated",

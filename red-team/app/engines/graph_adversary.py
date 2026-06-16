@@ -26,6 +26,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from app.utils.audit_logger import get_logger
+from app.engines.tgep_bypass_graphs import generate_tgep_bypass_graph  # noqa: F401 re-export
 
 log = get_logger(__name__)
 
