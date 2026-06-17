@@ -2,10 +2,10 @@
 
 ## STATUS
 PHASE: DEPLOYMENT_PENDING
-LAST_COMPLETED_TASK: Upgraded mutation and graph generation to bypass 3 tiers of Blue Team detection & Isolation Forest
-NEXT_TASK: Test new bypasses against TGEP manually
+LAST_COMPLETED_TASK: Rewrote all 17 graph_exporter.py archetype templates with correct account counts, realistic timestamps, and TGEP-detectable fraud patterns
+NEXT_TASK: Test new output: send ingest, get attack-graph, paste JSON into TGEP manually, verify PDF evidence
 BLOCKING_ISSUE: none
-TESTS_PASSING: 139/139
+TESTS_PASSING: 145/145
 DEPLOYMENT_STATUS: PROTOTYPE — single process, in-memory stores, data lost on restart. Persistence deferred post-hackathon.
 
 ## COMPLETED_TASKS
@@ -84,16 +84,23 @@ DEPLOYMENT_STATUS: PROTOTYPE — single process, in-memory stores, data lost on 
 - red-team/app/engines/archetype_extractor.py
 - red-team/app/engines/mutation_engine.py
 - red-team/app/engines/graph_adversary.py
+- red-team/app/engines/tier_aware_mutations.py
+- red-team/app/engines/fingerprint_vary.py
+- red-team/app/engines/tgep_bypass_graphs.py
+- red-team/app/outputs/graph_exporter.py
+- red-team/app/outputs/tgep_client.py
+- red-team/app/outputs/attack_package.py
 - red-team/app/sandbox/shadow_scorer.py
 - red-team/app/sandbox/evaluators.py
 - red-team/app/knowledge/kb_store.py
 - red-team/app/api/ingest.py
 - red-team/app/api/report.py
 - red-team/app/api/evasions.py
-- red-team/app/api/tgep_webhook.py
 - red-team/app/api/briefing.py
+- red-team/app/api/attack_graph.py
 - red-team/app/utils/limiter.py
 - red-team/app/worker/pipeline.py
+- red-team/app/worker/pre_flight.py
 - red-team/docs/red_team_architecture.drawio
 - red-team/docs/red_team_architecture.svg
 - red-team/scripts/test_blue_team_webhook.py
@@ -106,6 +113,8 @@ DEPLOYMENT_STATUS: PROTOTYPE — single process, in-memory stores, data lost on 
 - red-team/tests/test_briefing.py
 - red-team/tests/test_security_and_queues.py
 - red-team/tests/test_tgep_contracts.py
+- red-team/tests/test_tier_bypass.py
+- red-team/tests/test_attack_package.py
 - start.ps1
 - stop.ps1
 
@@ -164,3 +173,14 @@ TGEP_WEBHOOK_CONNECTED: no — wiring deferred
 - Pipeline now runs a pre-flight tier check (logged via structlog) before mutations.
 - TGEP bypass graphs are now stored in `evasion_kb` with `mutation_type="graph_bypass_{evasion_type}"`.
 - All 139 tests passing (`test_tier_bypass.py` added).
+- Replaced output architecture: pipeline now builds attack packages (graph_exporter → tgep_client) per evasion.
+- NEW: `app/outputs/graph_exporter.py` — 17 archetype-specific TGEP graph templates.
+- NEW: `app/outputs/tgep_client.py` — async TGEP client (send_to_tgep, request_evidence, get_tgep_verdict, clear_tgep_graph).
+- NEW: `app/outputs/attack_package.py` — assembles per-evasion attack package and writes JSON file to outputs/.
+- NEW: `app/api/attack_graph.py` — GET /red-team/attack-graph/{ingest_id} endpoint.
+- UPDATED: `config.py` — TGEP_BASE_URL + TGEP_CLEAR_GRAPH_BETWEEN_ATTACKS replace old webhook URL.
+- UPDATED: `.env.example` — new TGEP settings documented.
+- UPDATED: `.gitignore` — outputs/ directory excluded.
+- UPDATED: `kb_store.py` — added tgep_graph + tgep_response fields to evasion rows.
+- UPDATED: `pipeline.py` — per-evasion attack package build + TGEP send (non-blocking) replaces fire-and-forget webhook.
+- All 145 tests passing (`test_attack_package.py` added with 5 tests).

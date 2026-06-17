@@ -52,10 +52,14 @@ class Settings(BaseSettings):
         description="Blue Team main API base URL (reference only)",
     )
 
-    # ── TGEP webhook ──────────────────────────────────────────────
-    tgep_webhook_url: str = Field(
-        default="http://localhost:9000/api/red-team/evaluate",
-        description="TGEP endpoint for patch proposal webhooks",
+    # ── TGEP client ───────────────────────────────────────────────
+    tgep_base_url: str = Field(
+        default="https://transaction-graph-engine-f0kkb5as0-bytejay-s-projects.vercel.app",
+        description="Base URL for the TGEP public API (no auth required)",
+    )
+    tgep_clear_graph_between_attacks: bool = Field(
+        default=True,
+        description="If True, POST /graph/clear before sending each new attack graph",
     )
 
     # ── Database ──────────────────────────────────────────────────

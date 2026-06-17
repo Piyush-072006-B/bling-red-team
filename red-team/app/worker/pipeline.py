@@ -35,10 +35,11 @@ from app.engines.graph_adversary import VALID_GATES, generate_all_bypasses, gene
 from app.engines.mutation_engine import generate_mutations
 from app.engines.tgep_bypass_graphs import VALID_BYPASS_TYPES, generate_tgep_bypass_graph
 from app.ingest.router import _queues, get_ingest_log, update_ingest_status
-from app.knowledge.kb_store import append_evasion
+from app.knowledge.kb_store import append_evasion, update_evasion_tgep_result
+from app.outputs.attack_package import build_attack_package, package_to_json_file
+from app.outputs.tgep_client import clear_tgep_graph, send_to_tgep
 from app.sandbox.evaluators import context_bypass, feature_sensitivity, gate_probe
 from app.sandbox.shadow_scorer import score_transaction
-from app.api.tgep_webhook import maybe_fire_tgep_for_report
 from app.worker.pre_flight import pre_flight_tier_check
 from app.utils.audit_logger import get_logger
 
@@ -233,6 +234,16 @@ async def _pipeline_fraud_dna(ingest_id: str, payload: Any) -> None:
         evasion_id = append_evasion(evasion_data)
         evasion_ids.append(evasion_id)
 
+        # Build + send attack package for each feature mutation (non-blocking)
+        try:
+            pkg = build_attack_package(evasion_data, archetype)
+            package_to_json_file(pkg)
+            await clear_tgep_graph()
+            tgep_resp = await send_to_tgep(pkg["tgep_graph"])
+            update_evasion_tgep_result(evasion_id, tgep_resp)
+        except Exception as exc:
+            log.warning("attack_package_send_error", evasion_id=evasion_id, error=str(exc))
+
     # Step 4 — Generate TGEP bypass graphs and store in KB
     for bypass_type in sorted(VALID_BYPASS_TYPES):
         graph_result = generate_tgep_bypass_graph(archetype, bypass_type)
@@ -250,17 +261,18 @@ async def _pipeline_fraud_dna(ingest_id: str, payload: Any) -> None:
             "gate_probe_result": {"edges": graph_result["edges"]},
             "feature_sensitivity_result": None,
             "context_bypass_result": None,
+            "tgep_graph": graph_result["edges"],
         }
         g_id = append_evasion(graph_evasion)
         evasion_ids.append(g_id)
 
-    # Fire TGEP webhook — only fires for HIGH/CRITICAL + recommended_action=PATCH
-    report = _build_report_for_tgep(ingest_id, archetype, evasion_ids)
-    tgep_result = await maybe_fire_tgep_for_report(report)
-    if tgep_result:
-        from app.knowledge.kb_store import update_evasion_tgep_result
-        for e_id in evasion_ids:
-            update_evasion_tgep_result(e_id, tgep_result)
+        # Send graph bypass to TGEP (non-blocking)
+        try:
+            await clear_tgep_graph()
+            tgep_resp = await send_to_tgep(graph_result["edges"])
+            update_evasion_tgep_result(g_id, tgep_resp)
+        except Exception as exc:
+            log.warning("graph_bypass_tgep_send_error", bypass_type=bypass_type, error=str(exc))
 
 
 # ─────────────────────────────────────────────────────────────────────────────

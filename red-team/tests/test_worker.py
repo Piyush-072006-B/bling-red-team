@@ -85,13 +85,16 @@ def mock_shadow_scorer_low():
 
 @pytest.fixture
 def mock_tgep():
-    """Patch maybe_fire_tgep_for_report to be a no-op."""
+    """Patch send_to_tgep and clear_tgep_graph to be no-ops (avoids network calls)."""
     with patch(
-        "app.worker.pipeline.maybe_fire_tgep_for_report",
+        "app.worker.pipeline.send_to_tgep",
         new_callable=AsyncMock,
-        return_value={},
-    ) as mock:
-        yield mock
+        return_value={"status": "ok"},
+    ) as mock_send, patch(
+        "app.worker.pipeline.clear_tgep_graph",
+        new_callable=AsyncMock,
+    ):
+        yield mock_send
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -237,13 +240,13 @@ class TestFraudDNAPipeline:
 
     @pytest.mark.asyncio
     async def test_fraud_dna_pipeline_fires_tgep_webhook(self, mock_shadow_scorer, mock_tgep):
-        """TGEP webhook should be called once after pipeline completes."""
+        """send_to_tgep should be called for each mutation + graph bypass after pipeline completes."""
         from app.ingest.router import _ingest_log
         _ingest_log.append({"id": "INGEST-006", "status": "QUEUED"})
 
         await _pipeline_fraud_dna("INGEST-006", _FakeFraudDNA())
 
-        mock_tgep.assert_called_once()
+        assert mock_tgep.call_count > 0, "Expected send_to_tgep to be called at least once"
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -4,10 +4,12 @@ Red Team FastAPI Application Entry Point
 Wires all routers, auth middleware, health endpoint, and rate limiting.
 
 Endpoints:
-  POST /red-team/ingest         — ingest fraud signals (rate limited: 500/min)
-  GET  /red-team/report/{id}    — full evasion analysis for an ingest
-  GET  /red-team/evasions       — paginated evasion KB listing
-  GET  /health                  — service health check (no auth)
+  POST /red-team/ingest              — ingest fraud signals (rate limited: 500/min)
+  GET  /red-team/report/{id}         — full evasion analysis for an ingest
+  GET  /red-team/evasions            — paginated evasion KB listing
+  GET  /red-team/briefing            — developer intelligence briefing
+  GET  /red-team/attack-graph/{id}   — TGEP graph packages for an ingest
+  GET  /health                       — service health check (no auth)
 """
 
 from __future__ import annotations
@@ -21,6 +23,7 @@ from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
+from app.api import attack_graph as attack_graph_router
 from app.api import briefing as briefing_router
 from app.api import evasions as evasions_router
 from app.api import ingest as ingest_router
@@ -108,6 +111,7 @@ app.include_router(ingest_router.router)
 app.include_router(report_router.router)
 app.include_router(evasions_router.router)
 app.include_router(briefing_router.router)
+app.include_router(attack_graph_router.router)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
