@@ -66,7 +66,7 @@ def _assign_priority(payload: "IngestPayload") -> str:
     """Return priority string for the given payload type."""
     source = payload.source_type
 
-    if source == "FRAUD_DNA":
+    if source == "FRAUD_DNA" or source == "DATASET":
         return "HIGH"
 
     if source == "NOVELTY":
@@ -87,6 +87,7 @@ def _queued_for_label(source_type: str, priority: str) -> str:
     """Human-readable label for which analysis pipeline this signal is queued for."""
     labels = {
         "FRAUD_DNA": "archetype_extraction + mutation_engine",
+        "DATASET": "archetype_extraction + mutation_engine",
         "NOVELTY": "archetype_extraction + graph_adversary",
         "GATE_MISS": "graph_adversary",
     }
@@ -114,6 +115,10 @@ def _make_dedup_hash(payload: "IngestPayload") -> str | None:
         raw = payload.transaction_id  # type: ignore[union-attr]
     elif payload.source_type == "NOVELTY":
         raw = payload.fingerprint_id  # type: ignore[union-attr]
+    elif payload.source_type == "DATASET":
+        # Use dataset_name + original_record_id for dedup
+        rid = getattr(payload, "original_record_id", None) or ""
+        raw = f"{payload.dataset_name}_{rid}"  # type: ignore[union-attr]
     else:
         return None
 

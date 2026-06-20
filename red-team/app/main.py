@@ -59,10 +59,26 @@ async def lifespan(app: FastAPI):
     worker_task = asyncio.create_task(worker_loop(), name="red_team_worker")
     log.info("worker_task_started")
 
+    # Start the self-generation loop (generates patterns when Blue Team is offline)
+    from app.engines.self_generator import start_self_generation_loop
+    self_gen_task = asyncio.create_task(
+        start_self_generation_loop(
+            interval_seconds=settings.self_generation_interval_seconds,
+            enabled=settings.self_generation_enabled,
+        ),
+        name="red_team_self_gen",
+    )
+    log.info("self_gen_task_started")
+
     yield
 
-    # Graceful shutdown: cancel the worker and wait for it to finish
+    # Graceful shutdown: cancel both tasks and wait for them to finish
+    self_gen_task.cancel()
     worker_task.cancel()
+    try:
+        await self_gen_task
+    except asyncio.CancelledError:
+        pass
     try:
         await worker_task
     except asyncio.CancelledError:

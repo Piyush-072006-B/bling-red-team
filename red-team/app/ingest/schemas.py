@@ -263,10 +263,68 @@ class GateMissLog(BaseModel):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# DatasetRecord — bulk-loaded fraud dataset records
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class DatasetRecord(BaseModel):
+    """Bulk-loaded record from a fraud research dataset.
+
+    Routes through the full FRAUD_DNA pipeline (22 mutations) so that
+    BAF NeurIPS 2022, PaySim, or IEEE-CIS records can be automatically
+    used for adversarial pattern generation.
+    """
+
+    source_type: Literal["DATASET"] = "DATASET"
+
+    dataset_name: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=128,
+            description="Dataset identifier (e.g. 'BAF_NeurIPS_2022', 'PaySim', 'IEEE_CIS')",
+        ),
+    ]
+
+    archetype: Annotated[
+        str,
+        Field(description="Fraud archetype label from the dataset"),
+    ]
+
+    feature_vector: Annotated[
+        dict[str, float],
+        Field(description="Feature vector from the dataset record"),
+    ]
+
+    label: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=64,
+            description="Ground truth label (e.g. 'confirmed_fraud', 'suspicious')",
+        ),
+    ]
+
+    original_record_id: str | None = Field(
+        default=None,
+        max_length=256,
+        description="Original record ID from the source dataset",
+    )
+
+    @field_validator("feature_vector")
+    @classmethod
+    def validate_feature_vector_not_empty(cls, v: dict[str, float]) -> dict[str, float]:
+        if not v:
+            raise ValueError("feature_vector must not be empty")
+        return v
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Discriminated union — used by the ingest API endpoint
 # ─────────────────────────────────────────────────────────────────────────────
 
 IngestPayload = Annotated[
-    FraudDNA | NoveltyEscalation | GateMissLog,
+    FraudDNA | NoveltyEscalation | GateMissLog | DatasetRecord,
     Field(discriminator="source_type"),
 ]
+

@@ -9,3 +9,6 @@ dist/
 htmlcov/
 .coverage
 /outputs/
+data/*.csv
+data/*.json
+!scripts/load_baf_dataset.py

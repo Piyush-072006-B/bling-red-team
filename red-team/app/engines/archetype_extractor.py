@@ -22,86 +22,9 @@ log = get_logger(__name__)
 # Incoming vectors are normalised before comparison.
 # ─────────────────────────────────────────────────────────────────────────────
 
-ARCHETYPE_SIGNATURES: dict[str, dict[str, float]] = {
-    "structuring": {
-        "amount_series_score": 1.0,
-        "txn_count_30d": 1.0,
-        "amount_vs_threshold_50000": 1.0,
-    },
-    "romance_scam": {
-        "counterparty_novelty": 1.0,
-        "return_ratio": 1.0,
-        "payee_vpa_age_days": 1.0,
-    },
-    "pig_butchering": {
-        "velocity_ratio": 1.0,
-        "burst_score": 1.0,
-        "counterparty_novelty": 1.0,
-    },
-    "merchant_terminal": {
-        "channel_switch": 1.0,
-        "return_ratio": 1.0,
-    },
-    "cash_in_mule": {
-        "cash_mule_sink_score": 1.0,
-        "dormancy_break": 1.0,
-    },
-    "otp_fraud": {
-        "burst_score": 1.0,
-        "channel_switch": 1.0,
-        "velocity_ratio": 1.0,
-    },
-    "digital_arrest": {
-        "night_txn_ratio": 1.0,
-        "payee_vpa_age_days": 1.0,
-        "amount_zscore": 1.0,
-    },
-    "investment_fraud": {
-        "channel_entropy": 1.0,
-        "counterparty_novelty": 1.0,
-        "burst_score": 1.0,
-    },
-    "account_takeover": {
-        "geography_switch": 1.0,
-        "channel_switch": 1.0,
-        "velocity_ratio": 1.0,
-    },
-    "low_slow_mule": {
-        "dormancy_reactivation_flag": 1.0,
-        "burst_score": 1.0,
-        "night_txn_ratio": 1.0,
-    },
-    "cycle_round_trip": {
-        "cycle_membership": 1.0,
-        "return_ratio": 1.0,
-        "fan_out_ratio": 1.0,
-    },
-    "salary_mule": {
-        "return_ratio": 1.0,
-        "velocity_ratio": 1.0,
-        "txn_count_30d": 1.0,
-    },
-    "rapid_layering": {
-        "temporal_acceleration": 1.0,
-        "fan_out_ratio": 1.0,
-        "velocity_ratio": 1.0,
-    },
-    "sim_swap": {
-        "geography_switch": 1.0,
-        "channel_switch": 1.0,
-        "burst_score": 1.0,
-    },
-    "ghost_node_cash": {
-        "cash_mule_sink_score": 1.0,
-        "geography_switch": 1.0,
-        "dormancy_break": 1.0,
-    },
-    "bipartite_mule": {
-        "bipartite_score": 1.0,
-        "fan_out_ratio": 1.0,
-        "distinct_counterparties_30d": 1.0,
-    },
-}
+from app.engines.seed_library import get_all_seeds
+
+ARCHETYPE_SIGNATURES = get_all_seeds()
 
 # Precompute normalised signature centroids once at module load
 _NORMALISED_SIGNATURES: dict[str, dict[str, float]] = {

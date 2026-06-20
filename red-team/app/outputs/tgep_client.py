@@ -30,7 +30,10 @@ def _tgep_base() -> str:
 
 async def send_to_tgep(graph: list[dict[str, Any]]) -> dict[str, Any]:
     """POST transaction edges to TGEP /transaction/manual. Returns full TGEP response."""
-    url = f"{_tgep_base()}/transaction/manual"
+    base = _tgep_base()
+    if not base:
+        return {"error": "TGEP_BASE_URL not configured", "status": "unreachable"}
+    url = f"{base}/transaction/manual"
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
             resp = await client.post(url, json={"transactions": graph})
@@ -45,7 +48,10 @@ async def send_to_tgep(graph: list[dict[str, Any]]) -> dict[str, Any]:
 
 async def request_evidence(graph_id: str | None = None) -> dict[str, Any]:
     """POST to TGEP /api/evidence/generate. Returns {json_file, pdf_file, download_url}."""
-    url = f"{_tgep_base()}/api/evidence/generate"
+    base = _tgep_base()
+    if not base:
+        return {"error": "TGEP_BASE_URL not configured", "status": "unreachable"}
+    url = f"{base}/api/evidence/generate"
     body: dict[str, Any] = {}
     if graph_id:
         body["graph_id"] = graph_id
@@ -63,7 +69,10 @@ async def request_evidence(graph_id: str | None = None) -> dict[str, Any]:
 
 async def get_tgep_verdict() -> dict[str, Any]:
     """GET TGEP /api/graph/state. Returns current graph state including Blue Team verdict."""
-    url = f"{_tgep_base()}/api/graph/state"
+    base = _tgep_base()
+    if not base:
+        return {"error": "TGEP_BASE_URL not configured", "status": "unreachable"}
+    url = f"{base}/api/graph/state"
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
             resp = await client.get(url)
@@ -78,9 +87,10 @@ async def get_tgep_verdict() -> dict[str, Any]:
 
 async def clear_tgep_graph() -> None:
     """POST /graph/clear to reset TGEP graph state between attacks (if enabled in config)."""
-    if not get_settings().tgep_clear_graph_between_attacks:
+    base = _tgep_base()
+    if not base or not get_settings().tgep_clear_graph_between_attacks:
         return
-    url = f"{_tgep_base()}/graph/clear"
+    url = f"{base}/graph/clear"
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
             await client.post(url)

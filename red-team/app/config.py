@@ -100,6 +100,20 @@ class Settings(BaseSettings):
         description="Max items per priority queue tier. Returns 503 when full.",
     )
 
+    # ── Self-generation ──────────────────────────────────────────
+    self_generation_enabled: bool = Field(
+        default=True,
+        description="Enable periodic self-generation of adversarial patterns from seed library",
+    )
+    self_generation_interval_seconds: int = Field(
+        default=300,
+        description="Seconds between self-generation cycles (default: 5 minutes)",
+    )
+    self_generation_archetypes_per_cycle: int = Field(
+        default=3,
+        description="Number of archetypes to generate per cycle",
+    )
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

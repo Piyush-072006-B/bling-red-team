@@ -186,31 +186,38 @@ def _graph_low_slow_mule(amt: float) -> list[dict]:
 
 def _graph_romance_scam(amt: float) -> list[dict]:
     """
-    Escalating transfers to same new VPA over 9 days.
+    Escalating transfers to same new VPA over 9 days, then layered out.
     """
     now = _utcnow()
     a = "RT_ROMANCE_SCAM"
-    specs = [(1, 5000), (3, 25000), (5, 75000), (7, 250000), (9, 500000)]
     return [
-        _edge(f"{a}_VICTIM", f"{a}_SCAMMER", amount, "UPI",
-              now - timedelta(days=9 - day))
-        for day, amount in specs
+        _edge(f"{a}_VICTIM", f"{a}_SCAMMER", 5000, "UPI", now - timedelta(days=8)),
+        _edge(f"{a}_VICTIM", f"{a}_SCAMMER", 25000, "UPI", now - timedelta(days=6)),
+        _edge(f"{a}_VICTIM", f"{a}_SCAMMER", 75000, "UPI", now - timedelta(days=4)),
+        _edge(f"{a}_VICTIM", f"{a}_SCAMMER", 250000, "UPI", now - timedelta(days=2)),
+        _edge(f"{a}_VICTIM", f"{a}_SCAMMER", 500000, "UPI", now),
+        _edge(f"{a}_SCAMMER", f"{a}_LAYER_1", 480000, "IMPS", now + timedelta(minutes=10)),
+        _edge(f"{a}_LAYER_1", f"{a}_LAYER_2", 465000, "NEFT", now + timedelta(minutes=25)),
+        _edge(f"{a}_LAYER_2", f"{a}_COLLECTOR", 450000, "UPI", now + timedelta(minutes=40)),
     ]
 
 
 def _graph_pig_butchering(amt: float) -> list[dict]:
     """
-    3 small trust-building txns then 1 large exit + immediate crypto gateway forward.
+    3 small trust-building txns then 1 large exit + immediate crypto gateway forward + layering.
     """
     now = _utcnow()
     a = "RT_PIG_BUTCHERING"
-    base_d10 = now - timedelta(days=0)
+    base_d10 = now
     return [
         _edge(f"{a}_VICTIM",   f"{a}_PLATFORM",    1000, "UPI",  now - timedelta(days=9)),
         _edge(f"{a}_VICTIM",   f"{a}_PLATFORM",    5000, "UPI",  now - timedelta(days=6)),
         _edge(f"{a}_VICTIM",   f"{a}_PLATFORM",   15000, "UPI",  now - timedelta(days=2)),
         _edge(f"{a}_VICTIM",   f"{a}_PLATFORM",  950000, "UPI",  base_d10),
         _edge(f"{a}_PLATFORM", f"{a}_CRYPTO_GW", 945000, "RTGS", base_d10 + timedelta(minutes=5)),
+        _edge(f"{a}_CRYPTO_GW",f"{a}_LAYER_1",   920000, "UPI",  base_d10 + timedelta(minutes=20)),
+        _edge(f"{a}_LAYER_1",  f"{a}_LAYER_2",   895000, "IMPS", base_d10 + timedelta(minutes=35)),
+        _edge(f"{a}_LAYER_2",  f"{a}_FINAL",     870000, "NEFT", base_d10 + timedelta(minutes=50)),
     ]
 
 
@@ -245,7 +252,7 @@ def _graph_account_takeover(amt: float) -> list[dict]:
 
 def _graph_otp_fraud(amt: float) -> list[dict]:
     """
-    3 failed small attempts then 1 large success + immediate mule forward.
+    3 failed small attempts then 1 large success + immediate mule forward and layering.
     """
     base = _utcnow().replace(second=0, microsecond=0)
     a = "RT_OTP_FRAUD"
@@ -254,7 +261,9 @@ def _graph_otp_fraud(amt: float) -> list[dict]:
         _edge(f"{a}_VICTIM",    f"{a}_FRAUD_ACC",   500, "UPI",  base + timedelta(minutes=2)),
         _edge(f"{a}_VICTIM",    f"{a}_FRAUD_ACC",   500, "UPI",  base + timedelta(minutes=4)),
         _edge(f"{a}_VICTIM",    f"{a}_FRAUD_ACC", 450000, "UPI",  base + timedelta(minutes=8)),
-        _edge(f"{a}_FRAUD_ACC", f"{a}_MULE",      445000, "IMPS", base + timedelta(minutes=10)),
+        _edge(f"{a}_FRAUD_ACC", f"{a}_MULE_1",    445000, "IMPS", base + timedelta(minutes=10)),
+        _edge(f"{a}_MULE_1",    f"{a}_MULE_2",    432000, "NEFT", base + timedelta(minutes=22)),
+        _edge(f"{a}_MULE_2",    f"{a}_COLLECTOR", 419000, "UPI",  base + timedelta(minutes=35)),
     ]
 
 
@@ -288,15 +297,17 @@ def _graph_ghost_node_cash(amt: float) -> list[dict]:
 
 def _graph_merchant_terminal(amt: float) -> list[dict]:
     """
-    Round-trip through POS terminal: ACC→POS→ACC→POS→COLLECTOR.
+    Round-trip through POS terminal: ACC→POS→ACC→POS→COLLECTOR and secondary POS cycle.
     """
     base = _utcnow().replace(second=0, microsecond=0)
     a = "RT_MERCHANT_TERMINAL"
     return [
-        _edge(f"{a}_ACC",        f"{a}_POS_TERMINAL", 85000, "UPI",  base),
-        _edge(f"{a}_POS_TERMINAL", f"{a}_ACC",         83000, "UPI",  base + timedelta(minutes=5)),
-        _edge(f"{a}_ACC",        f"{a}_POS_TERMINAL", 80000, "UPI",  base + timedelta(minutes=8)),
-        _edge(f"{a}_POS_TERMINAL", f"{a}_COLLECTOR",   78000, "IMPS", base + timedelta(minutes=12)),
+        _edge(f"{a}_ACC",            f"{a}_POS_TERMINAL_1", 85000, "UPI",  base),
+        _edge(f"{a}_POS_TERMINAL_1", f"{a}_ACC",            83000, "UPI",  base + timedelta(minutes=5)),
+        _edge(f"{a}_ACC",            f"{a}_POS_TERMINAL_1", 80000, "UPI",  base + timedelta(minutes=8)),
+        _edge(f"{a}_POS_TERMINAL_1", f"{a}_COLLECTOR",      78000, "IMPS", base + timedelta(minutes=12)),
+        _edge(f"{a}_ACC",            f"{a}_POS_TERMINAL_2", 76000, "UPI",  base + timedelta(minutes=18)),
+        _edge(f"{a}_POS_TERMINAL_2", f"{a}_COLLECTOR",      74000, "NEFT", base + timedelta(minutes=25)),
     ]
 
 

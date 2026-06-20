@@ -137,7 +137,7 @@ async def _process_item(item: dict[str, Any]) -> None:
     update_ingest_status(ingest_id, "IN_PROGRESS")
 
     try:
-        if source_type == "FRAUD_DNA":
+        if source_type in ("FRAUD_DNA", "DATASET"):
             await _pipeline_fraud_dna(ingest_id, payload)
         elif source_type == "NOVELTY":
             await _pipeline_novelty(ingest_id, payload)

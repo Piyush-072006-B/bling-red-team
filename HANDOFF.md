@@ -2,10 +2,10 @@
 
 ## STATUS
 PHASE: DEPLOYMENT_PENDING
-LAST_COMPLETED_TASK: Rewrote all 17 graph_exporter.py archetype templates with correct account counts, realistic timestamps, and TGEP-detectable fraud patterns
-NEXT_TASK: Test new output: send ingest, get attack-graph, paste JSON into TGEP manually, verify PDF evidence
+LAST_COMPLETED_TASK: Built load_baf_dataset.py one-time script to compute real archetype signatures and seeds from the BAF NeurIPS 2022 dataset using KMeans clustering. Outputs saved to JSON.
+NEXT_TASK: Review computed_archetype_seeds.json and computed_archetype_signatures.json, then apply if values look reasonable
 BLOCKING_ISSUE: none
-TESTS_PASSING: 145/145
+TESTS_PASSING: 152/152
 DEPLOYMENT_STATUS: PROTOTYPE — single process, in-memory stores, data lost on restart. Persistence deferred post-hackathon.
 
 ## COMPLETED_TASKS
@@ -101,6 +101,9 @@ DEPLOYMENT_STATUS: PROTOTYPE — single process, in-memory stores, data lost on 
 - red-team/app/utils/limiter.py
 - red-team/app/worker/pipeline.py
 - red-team/app/worker/pre_flight.py
+- red-team/app/engines/seed_data.py
+- red-team/app/engines/seed_library.py
+- red-team/app/engines/self_generator.py
 - red-team/docs/red_team_architecture.drawio
 - red-team/docs/red_team_architecture.svg
 - red-team/scripts/test_blue_team_webhook.py
@@ -115,6 +118,7 @@ DEPLOYMENT_STATUS: PROTOTYPE — single process, in-memory stores, data lost on 
 - red-team/tests/test_tgep_contracts.py
 - red-team/tests/test_tier_bypass.py
 - red-team/tests/test_attack_package.py
+- red-team/tests/test_seed_library.py
 - start.ps1
 - stop.ps1
 
@@ -184,3 +188,14 @@ TGEP_WEBHOOK_CONNECTED: no — wiring deferred
 - UPDATED: `kb_store.py` — added tgep_graph + tgep_response fields to evasion rows.
 - UPDATED: `pipeline.py` — per-evasion attack package build + TGEP send (non-blocking) replaces fire-and-forget webhook.
 - All 145 tests passing (`test_attack_package.py` added with 5 tests).
+- SELF_GENERATION: enabled, 5-minute intervals, 3 archetypes per cycle.
+- Seed library provides 16 realistic feature vectors (59 features each) from BAF NeurIPS 2022 + PaySim statistics.
+- NEW: `app/engines/seed_data.py` — 16 archetype seed vectors, each with all 59 Blue Team features.
+- NEW: `app/engines/seed_library.py` — get_seed, get_all_seeds, get_seed_with_variation (±noise on numeric features, binary flags preserved).
+- NEW: `app/engines/self_generator.py` — run_self_generation_cycle + start_self_generation_loop (asyncio task, backpressure at 50 pending).
+- NEW: `app/ingest/schemas.py` — DatasetRecord (source_type="DATASET") added to discriminated union, routes through FRAUD_DNA pipeline.
+- UPDATED: `config.py` — SELF_GENERATION_ENABLED, SELF_GENERATION_INTERVAL_SECONDS, SELF_GENERATION_ARCHETYPES_PER_CYCLE.
+- UPDATED: `main.py` — self_gen_task started in lifespan alongside worker_task, cancelled on shutdown.
+- UPDATED: `pipeline.py` — DATASET source_type routes to _pipeline_fraud_dna.
+- UPDATED: `router.py` — DATASET gets HIGH priority, dataset_name+original_record_id dedup.
+- All 151 tests passing (`test_seed_library.py` added with 6 tests).
