@@ -2,10 +2,10 @@
 
 ## STATUS
 PHASE: DEPLOYMENT_PENDING
-LAST_COMPLETED_TASK: Built load_baf_dataset.py one-time script to compute real archetype signatures and seeds from the BAF NeurIPS 2022 dataset using KMeans clustering. Outputs saved to JSON.
-NEXT_TASK: Review computed_archetype_seeds.json and computed_archetype_signatures.json, then apply if values look reasonable
+LAST_COMPLETED_TASK: Fixed _apply_delta logic for sparse payloads so missing features injected as 0.0 aren't dropped. Added tests_sparse_payload_mutations.py.
+NEXT_TASK: Retest tier-aware mutations against TGEP using real BAF-derived archetype seeds — send digital_arrest ingest, get attack-graph, verify compound_full_bypass graph now uses correct archetype template instead of NEW_VARIANT
 BLOCKING_ISSUE: none
-TESTS_PASSING: 152/152
+TESTS_PASSING: 155/155
 DEPLOYMENT_STATUS: PROTOTYPE — single process, in-memory stores, data lost on restart. Persistence deferred post-hackathon.
 
 ## COMPLETED_TASKS

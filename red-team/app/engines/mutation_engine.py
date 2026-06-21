@@ -87,20 +87,27 @@ def _clamp(value: float, lo: float = 0.0, hi: float = 1.0) -> float:
 def _apply_delta(
     base: dict[str, float],
     overrides: dict[str, float],
-) -> tuple[dict[str, float], dict[str, float]]:
+) -> tuple[dict[str, float], dict[str, float], list[str]]:
     """
-    Return (mutated_vector, delta_features).
+    Return (mutated_vector, delta_features, injected_features).
     Only keys in overrides are changed; rest is copied unchanged.
     """
     mutated = copy.deepcopy(base)
     delta: dict[str, float] = {}
+    injected: list[str] = []
     for k, new_val in overrides.items():
+        is_absent = k not in base
         old_val = base.get(k, 0.0)
         clamped = new_val if new_val > 1.0 else _clamp(new_val)
         mutated[k] = clamped
-        if abs(clamped - old_val) > 1e-9:
+        
+        if is_absent:
+            injected.append(k)
             delta[k] = round(clamped - old_val, 6)
-    return mutated, delta
+        elif abs(clamped - old_val) > 1e-9:
+            delta[k] = round(clamped - old_val, 6)
+            
+    return mutated, delta, injected
 
 
 def build_mutation(
@@ -109,13 +116,14 @@ def build_mutation(
     overrides: dict[str, float],
 ) -> dict[str, Any] | None:
     """Build a mutation record, or return None if no features actually changed."""
-    mutated, delta = _apply_delta(original, overrides)
-    if not delta:
+    mutated, delta, injected = _apply_delta(original, overrides)
+    if not delta and not injected:
         return None  # nothing changed — skip this mutation
     return {
         "mutation_id": str(uuid.uuid4()),
         "mutation_type": mutation_type,
         "delta_features": delta,
+        "injected_features": injected,
         "original_vector": copy.deepcopy(original),
         "mutated_vector": mutated,
     }
