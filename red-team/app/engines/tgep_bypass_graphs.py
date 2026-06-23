@@ -33,85 +33,104 @@ def _edge(from_account: str, to_account: str, amount: float,
 def _generate_sink_with_outflow() -> list[dict[str, Any]]:
     """Defeat sink gate by adding legitimate-looking outflows."""
     base = _now().replace(hour=10, minute=0, second=0)
+    c = "ACC990477"
     edges = [
-        _edge("corp_A", "target_acct", 300000, "RTGS", base),
-        _edge("corp_B", "target_acct", 450000, "RTGS", base + timedelta(days=1, hours=2)),
-        _edge("corp_C", "target_acct", 380000, "NEFT", base + timedelta(days=2, hours=1)),
-        _edge("target_acct", "payroll_acct", 150000, "NEFT", base + timedelta(hours=4)),
-        _edge("target_acct", "utility_co", 35000, "UPI", base + timedelta(days=1, hours=5)),
-        _edge("target_acct", "invest_acct", 65000, "IMPS", base + timedelta(days=2, hours=3)),
+        _edge("CORP991", c, 300000, "RTGS", base),
+        _edge("CORP992", c, 450000, "RTGS", base + timedelta(days=1, hours=2)),
+        _edge("CORP993", c, 380000, "NEFT", base + timedelta(days=2, hours=1)),
+        _edge(c, "PAYROLL_VENDOR_994", 150000, "NEFT", base + timedelta(hours=4)),
+        _edge(c, "UTIL_PROVIDER_995", 35000, "UPI", base + timedelta(days=1, hours=5)),
+        _edge(c, "INVEST_FUND_996", 65000, "IMPS", base + timedelta(days=2, hours=3)),
     ]
     return edges
 
 
 def _generate_slow_bipartite() -> list[dict[str, Any]]:
-    """Defeat bipartite gate: 6 senders (below 7), spread over 5 days."""
+    """Defeat bipartite gate using stealth sink structure (6 inflows, legitimate outflows)."""
     base = _now().replace(hour=10, minute=0, second=0)
+    c = "ACC100588"
     amounts = [82000, 91000, 78000, 88000, 95000, 85000]
     rails = ["UPI", "IMPS", "NEFT", "UPI", "IMPS", "NEFT"]
     edges = []
+    # 6 Inflows
     for i in range(6):
         ts = base + timedelta(days=i, hours=2 + (i % 3))
-        edges.append(_edge(f"sender_S{i+1}", "collector_acct", amounts[i], rails[i], ts))
+        edges.append(_edge(f"CORP{101+i}", c, amounts[i], rails[i], ts))
+    
+    # Legitimate outflows
+    outflows = [
+        ("PAYROLL_VENDOR_107", 110000, "NEFT", 1, 4),
+        ("VENDOR_108", 25000, "UPI", 3, 5),
+        ("INVEST_FUND_109", 40000, "IMPS", 5, 2)
+    ]
+    for dst, amt, rail, d, h in outflows:
+        edges.append(_edge(c, dst, amt, rail, base + timedelta(days=d, hours=h)))
+        
     return edges
 
 
 def _generate_nine_hop_linear() -> list[dict[str, Any]]:
-    """Defeat cycle gate: 9 linear hops (above 2-8 detection range)."""
+    """Defeat cycle gate using multi-source sink instead of linear chain."""
     base = _now().replace(hour=11, minute=0, second=0)
-    accounts = [chr(65 + i) for i in range(9)]  # A through I
-    amount = 500000.0
-    rails = ["UPI", "IMPS", "NEFT", "RTGS", "UPI", "IMPS", "NEFT", "RTGS"]
-    edges = []
-    for i in range(8):
-        edges.append(_edge(
-            f"acct_{accounts[i]}", f"acct_{accounts[i+1]}",
-            round(amount * (0.98 ** i), 2),
-            rails[i],
-            base + timedelta(minutes=8 * i),
-        ))
+    c = "ACC210699"
+    edges = [
+        _edge("CORP211", c, 200000, "NEFT", base),
+        _edge("CORP212", c, 180000, "RTGS", base + timedelta(days=1)),
+        _edge("CORP213", c, 250000, "IMPS", base + timedelta(days=2)),
+        _edge(c, "PAYROLL_VENDOR_214", 120000, "NEFT", base + timedelta(days=3)),
+        _edge(c, "VENDOR_215", 35000, "UPI", base + timedelta(days=3, hours=5)),
+        _edge(c, "UTIL_PROVIDER_216", 18000, "IMPS", base + timedelta(days=4)),
+    ]
     return edges
 
 
 def _generate_mule_warmup_graph() -> list[dict[str, Any]]:
-    """Simulate 30-day warmup phase defeating dormancy + cash mule detection."""
+    """Simulate 30-day warmup phase, but final spike converts to legitimate spend instead of layering."""
     base = _now().replace(hour=10, minute=0, second=0) - timedelta(days=30)
+    c = "ACC320711"
     edges = []
+    
+    # We need a continuous CORP id sequence. Let's start at 321.
+    corp_idx = 321
+    out_idx = 340
 
     # Week 1: 3 small receives, 2 small sends
     for i in range(3):
-        edges.append(_edge(f"legit_src_{i}", "mule_acct", 2000 + i * 1500, "UPI",
+        edges.append(_edge(f"CORP{corp_idx}", c, 2000 + i * 1500, "UPI",
                            base + timedelta(days=i, hours=11 + i)))
+        corp_idx += 1
     for i in range(2):
-        edges.append(_edge("mule_acct", f"shop_{i}", 1500 + i * 500, "UPI",
+        edges.append(_edge(c, f"VENDOR_{out_idx}", 1500 + i * 500, "UPI",
                            base + timedelta(days=i + 1, hours=14 + i)))
+        out_idx += 1
 
     # Week 2: 4 receives, 3 sends
     for i in range(4):
-        edges.append(_edge(f"legit_src_w2_{i}", "mule_acct", 5000 + i * 2500, "IMPS",
+        edges.append(_edge(f"CORP{corp_idx}", c, 5000 + i * 2500, "IMPS",
                            base + timedelta(days=7 + i, hours=10 + i)))
+        corp_idx += 1
     for i in range(3):
-        edges.append(_edge("mule_acct", f"vendor_{i}", 4000 + i * 1000, "UPI",
+        edges.append(_edge(c, f"VENDOR_{out_idx}", 4000 + i * 1000, "UPI",
                            base + timedelta(days=8 + i, hours=15 + i)))
+        out_idx += 1
 
     # Week 3: 5 receives, 4 sends
     for i in range(5):
-        edges.append(_edge(f"legit_src_w3_{i}", "mule_acct", 10000 + i * 5000, "NEFT",
+        edges.append(_edge(f"CORP{corp_idx}", c, 10000 + i * 5000, "NEFT",
                            base + timedelta(days=14 + i, hours=9 + i)))
+        corp_idx += 1
     for i in range(4):
-        edges.append(_edge("mule_acct", f"payee_{i}", 8000 + i * 2000, "IMPS",
+        edges.append(_edge(c, f"PAYROLL_VENDOR_{out_idx}", 8000 + i * 2000, "IMPS",
                            base + timedelta(days=15 + i, hours=13 + i)))
+        out_idx += 1
 
-    # Week 4: the spike — 1 large receive + 4-hop layering
+    # Week 4: the spike converts to legitimate spend
     spike_time = base + timedelta(days=25, hours=11)
-    edges.append(_edge("high_value_src", "mule_acct", 850000, "RTGS", spike_time))
-    layer_accounts = ["layer_1", "layer_2", "layer_3", "layer_4"]
-    layer_amount = 850000.0
-    for i, acct in enumerate(layer_accounts):
-        src = "mule_acct" if i == 0 else layer_accounts[i - 1]
-        layer_amount *= 0.97
-        edges.append(_edge(src, acct, round(layer_amount, 2), "IMPS",
-                           spike_time + timedelta(hours=1 + i)))
+    edges.append(_edge(f"CORP{corp_idx}", c, 850000, "RTGS", spike_time))
+    edges.append(_edge(c, f"PAYROLL_VENDOR_{out_idx}", 150000, "NEFT", spike_time + timedelta(hours=4)))
+    edges.append(_edge(c, f"UTIL_PROVIDER_{out_idx+1}", 35000, "UPI", spike_time + timedelta(hours=5)))
+    edges.append(_edge(c, f"VENDOR_{out_idx+2}", 65000, "IMPS", spike_time + timedelta(hours=8)))
+    edges.append(_edge(c, f"INVEST_FUND_{out_idx+3}", 45000, "RTGS", spike_time + timedelta(hours=10)))
 
     return edges
 

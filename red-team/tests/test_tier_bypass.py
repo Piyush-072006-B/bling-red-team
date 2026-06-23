@@ -172,8 +172,8 @@ def test_gate_defeat_bipartite_below_threshold(fraud_vector):
 # ── Graph pattern tests ────────────────────────────────────────────
 
 
-def test_nine_hop_graph_has_9_accounts():
-    """nine_hop_linear graph must have 9 unique accounts."""
+def test_nine_hop_graph_has_7_accounts():
+    """nine_hop_linear graph was updated to multi-source sink structure with 7 accounts."""
     result = generate_tgep_bypass_graph("structuring", "nine_hop_linear")
     edges = result["edges"]
 
@@ -183,17 +183,18 @@ def test_nine_hop_graph_has_9_accounts():
         accounts.add(e["from_account"])
         accounts.add(e["to_account"])
 
-    assert len(accounts) == 9, f"Expected 9 accounts, got {len(accounts)}: {accounts}"
-    assert len(edges) == 8  # 8 transfers for 9 accounts
+    assert len(accounts) == 7, f"Expected 7 accounts, got {len(accounts)}: {accounts}"
+    assert len(edges) == 6  # 6 transfers for 7 accounts
 
 
 def test_sink_with_outflow_ratio_below_threshold():
     """out/in ratio must be > 0.2 in sink_with_outflow graph."""
     result = generate_tgep_bypass_graph("pig_butchering", "sink_with_outflow")
     edges = result["edges"]
+    c = "ACC990477"
 
-    total_in = sum(e["amount"] for e in edges if e["to_account"] == "target_acct")
-    total_out = sum(e["amount"] for e in edges if e["from_account"] == "target_acct")
+    total_in = sum(e["amount"] for e in edges if e["to_account"] == c)
+    total_out = sum(e["amount"] for e in edges if e["from_account"] == c)
 
     ratio = total_out / total_in if total_in > 0 else 0
     assert ratio > 0.2, f"Outflow ratio {ratio:.3f} is not > 0.2"

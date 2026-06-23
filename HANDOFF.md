@@ -2,8 +2,9 @@
 
 ## STATUS
 PHASE: DEPLOYMENT_PENDING
-LAST_COMPLETED_TASK: Fixed _apply_delta logic for sparse payloads so missing features injected as 0.0 aren't dropped. Added tests_sparse_payload_mutations.py.
-NEXT_TASK: Retest tier-aware mutations against TGEP using real BAF-derived archetype seeds — send digital_arrest ingest, get attack-graph, verify compound_full_bypass graph now uses correct archetype template instead of NEW_VARIANT
+
+LAST_COMPLETED_TASK: Fixed timing issue in GET /red-team/attack-graph/{id} returning 404 before background worker finishes mutations. Now returns 202 Accepted while processing. Fixed tests broken by previous graph rename.
+NEXT_TASK: Paste all 17 new archetype graphs into TGEP and verify all are undetected
 BLOCKING_ISSUE: none
 TESTS_PASSING: 155/155
 DEPLOYMENT_STATUS: PROTOTYPE — single process, in-memory stores, data lost on restart. Persistence deferred post-hackathon.

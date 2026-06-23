@@ -9,7 +9,9 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 
+from app.ingest.router import get_ingest_log
 from app.knowledge.kb_store import query_evasions
 from app.outputs.attack_package import build_attack_package, package_to_json_file
 from app.utils.audit_logger import get_logger
@@ -31,7 +33,7 @@ router = APIRouter(
 async def get_attack_graph(
     ingest_id: str,
     _key: str = Depends(require_api_key),
-) -> dict[str, Any]:
+) -> Any:
     """
     Return all TGEP transaction graph packages for every evasion linked to this ingest.
 
@@ -42,13 +44,26 @@ async def get_attack_graph(
     - `tgep_verdict` — TGEP threat level if already scored (null if TGEP is not connected)
     - `json_file_path` — path to the saved JSON file for manual TGEP submission
     """
-    all_evasions = query_evasions(limit=1000)
-    linked = [e for e in all_evasions if e.get("ingest_log_id") == ingest_id]
-
-    if not linked:
+    log_entries = [entry for entry in get_ingest_log() if entry["id"] == ingest_id]
+    if not log_entries:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No evasions found for ingest_id='{ingest_id}'",
+            detail=f"ingest_id='{ingest_id}' not found",
+        )
+
+    all_evasions = query_evasions(limit=1000)
+    linked = [e for e in all_evasions if e.get("ingest_log_id") == ingest_id]
+    evasions_so_far = len(linked)
+
+    if evasions_so_far < 22:
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content={
+                "ingest_id": ingest_id,
+                "status": "processing",
+                "message": "Worker still processing mutations. Retry in 10 seconds.",
+                "evasions_so_far": evasions_so_far,
+            },
         )
 
     archetype: str = linked[0].get("archetype", "NEW_VARIANT")
