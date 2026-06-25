@@ -320,6 +320,19 @@ def generate_mutations(
 
     mutations = [m for m in candidates if m is not None]
 
+    # Apply KB feedback weights — sort by descending weight so historically
+    # successful mutations float to the front of the candidate list.
+    try:
+        from app.engines.kb_feedback import get_mutation_weights
+        weights = get_mutation_weights()
+        if weights:
+            mutations.sort(
+                key=lambda m: weights.get(m.get("mutation_type", ""), 1.0),
+                reverse=True,
+            )
+    except Exception:
+        pass  # KB feedback is best-effort; never block mutation generation
+
     # If an archetype has a specialised first-priority mutation, move it to front
     _prioritise_for_archetype(mutations, archetype)
 
@@ -336,6 +349,7 @@ def generate_mutations(
         produced=len(result),
     )
     return result
+
 
 
 def _prioritise_for_archetype(

@@ -1,506 +1,574 @@
-# BLING Red Team
-**Adversarial Fraud Simulation Engine — Union Bank of India**
+# BLING Red Team API
 
-![Python 3.11](https://img.shields.io/badge/Python-3.11-blue?style=flat-square)
-![FastAPI 0.111](https://img.shields.io/badge/FastAPI-0.111-009688?style=flat-square)
-![Tests: 127 passing](https://img.shields.io/badge/Tests-127_passing-success?style=flat-square)
-![Status: Prototype](https://img.shields.io/badge/Status-Prototype-orange?style=flat-square)
-![PostgreSQL 15](https://img.shields.io/badge/PostgreSQL-15-blue?style=flat-square)
-![Redis 7](https://img.shields.io/badge/Redis-7-red?style=flat-square)
+> **Adversarial simulation engine for BLING forensic fraud detection.**
+> Red Team output is **developer intelligence only** — never a blocking signal.
 
 ---
 
-## What This Is
+## Status / Badges
 
-Red Team is a post-transaction adversarial simulation engine built for the BLING Hackathon at Union Bank of India. It runs alongside Blue Team (forensic fraud detection) and TGEP (transaction graph engine).
+![Tests](https://img.shields.io/badge/tests-155%2F155-brightgreen)
+![Python](https://img.shields.io/badge/python-3.11-blue)
+![FastAPI](https://img.shields.io/badge/framework-FastAPI-009688)
+![Port](https://img.shields.io/badge/port-8002-lightgrey)
+![Status](https://img.shields.io/badge/status-Prototype-orange)
 
-It does NOT score live transactions and does NOT block anything. Its sole purpose: take confirmed fraud signals, mutate them 10 ways to find what Blue Team would miss, and produce developer intelligence — specific, actionable patch proposals.
+| Metric | Value |
+|---|---|
+| Test suite | ✅ 155 / 155 passing |
+| Python version | 3.11 |
+| Framework | FastAPI (async) |
+| Default port | `8002` |
+| Maturity | Prototype / Hackathon |
 
-Golden invariant: Every output is a proposal for a human developer. Nothing is automated. Investigators stay in control.
+---
 
-The system is composed of three services:
-- **Blue Team**: ML fraud detection, 3-tier pipeline, 59 features, 5 hard gates
-- **Red Team**: adversarial engine (this repo)
-- **TGEP**: graph pattern analysis deployed on Vercel
+## Table of Contents
+
+1. [Overview](#overview)
+2. [Architecture](#architecture)
+3. [Dataset Integration](#dataset-integration)
+4. [16 Archetypes](#16-archetypes)
+5. [Confirmed Findings](#confirmed-findings)
+6. [TGEP Graph Design](#tgep-graph-design)
+7. [API Reference](#api-reference)
+8. [Quickstart](#quickstart)
+9. [Environment Variables](#environment-variables)
+10. [Testing](#testing)
+11. [Known Limitations](#known-limitations)
+12. [Security](#security)
+
+---
+
+## Overview
+
+The **BLING Red Team service** is an adversarial simulation engine that operates alongside the Blue Team forensic fraud-detection pipeline. It ingests confirmed-fraud signals from the Blue Team (FraudDNA, Novelty escalations, Gate misses) and automatically:
+
+- Classifies each signal against **16 BAF-derived fraud archetypes** using cosine similarity.
+- Generates **22 targeted mutations** per signal to probe Blue Team detection gaps.
+- Runs **5 graph-adversary bypass checks** against Blue Team graph gates.
+- Packages each finding into a structured **attack package** (evasion vector + TGEP graph + bypass strategy).
+- Maintains a **knowledge-base feedback loop** where historical evasion success rates update future mutation weights.
+
+> [!IMPORTANT]
+> Red Team findings are **developer intelligence only**. They inform improvements to the Blue Team and TGEP detectors. They must **never** be wired into automated transaction blocking or customer-facing decisions.
 
 ---
 
 ## Architecture
 
-```text
+### High-Level Pipeline
+
+```
+Blue Team Signal
+       │
+       ▼
 POST /red-team/ingest
-        │
-        ▼
-┌─────────────────────┐
-│   Ingest Router     │  dedup · priority · sanitize PII
-│  (asyncio.Queue)    │  CRITICAL / HIGH / MEDIUM / LOW
-└────────┬────────────┘
-         │
-         ▼
-┌─────────────────────┐
-│   Worker Pipeline   │  background asyncio.Task
-│   pipeline.py       │
-└──┬──────┬───────────┘
-   │      │
-   ▼      ▼
-FRAUD_DNA          NOVELTY / GATE_MISS
-   │                    │
-   ▼                    ▼
-archetype_extractor  graph_adversary
-mutation_engine      (5 gate bypasses)
-shadow_scorer
-evaluators
-   │                    │
-   └──────────┬─────────┘
-              ▼
-      ┌───────────────┐
-      │   kb_store    │  append-only evasion KB
-      └───────┬───────┘
-              │
-      ┌───────┴────────────────────────────┐
-      │                                    │
-      ▼                                    ▼
-GET /red-team/briefing          TGEP webhook (HIGH/CRITICAL only)
-GET /red-team/report/{id}       fires to TGEP_WEBHOOK_URL
-GET /red-team/evasions
+       │
+       ▼
+AsyncIO Priority Queue
+  CRITICAL > HIGH > MEDIUM > LOW
+       │
+       ▼
+┌──────────────────────┐
+│  Pre-flight Tier Check│
+│  Tier 1: fast rules  │
+│  Tier 2: graph gates │
+└──────────┬───────────┘
+           │
+           ▼
+┌──────────────────────┐
+│  Archetype Extractor │
+│  Cosine similarity   │
+│  16 BAF signatures   │
+│  → archetype or      │
+│    NEW_VARIANT       │
+└──────────┬───────────┘
+           │
+           ▼
+┌──────────────────────────────────────────────────┐
+│  Mutation Engine  (22 mutations per signal)       │
+│                                                  │
+│  10 × Single-feature mutations                   │
+│     threshold, timing, velocity,                 │
+│     context, novelty                             │
+│                                                  │
+│   6 × Compound mutations                         │
+│     daytime_slowdown, structuring_ghost,         │
+│     festival_layering, mule_warmup,              │
+│     kyc_ghost, senior_festival_night             │
+│                                                  │
+│   6 × Tier-aware mutations                       │
+│     compound_full_bypass, tier1_safe,            │
+│     context_stack, gate_defeat_cycle,            │
+│     gate_defeat_sink, gate_defeat_bipartite      │
+└──────────┬───────────────────────────────────────┘
+           │
+           ▼
+┌──────────────────────┐
+│  Graph Adversary     │
+│  5 gate bypass checks│
+│  cycle / sink /      │
+│  bipartite /         │
+│  cash_mule /         │
+│  merchant            │
+└──────────┬───────────┘
+           │
+           ▼
+┌──────────────────────┐
+│  Attack Package      │
+│  Builder             │
+│  per-evasion TGEP    │
+│  graph + bypass      │
+│  strategy + JSON     │
+└──────────┬───────────┘
+           │
+           ▼
+┌──────────────────────┐
+│  KB Feedback Loop    │
+│  mutation weights ←  │
+│  evasion_success     │
+│  history             │
+└──────────────────────┘
+           │
+           ▼
+GET /red-team/attack-graph/{id}
+  202 → processing (evasions_so_far < 22)
+  200 → complete   (all 22 done)
 ```
 
-The draw.io architecture diagram is at `docs/red_team_architecture.drawio` and the SVG is at `docs/red_team_architecture.svg`.
+### Component Summary
+
+| Component | Responsibility |
+|---|---|
+| **Ingest endpoint** | Validates and enqueues Blue Team signals with priority |
+| **Priority queue worker** | Async background processor, respects CRITICAL > HIGH > MEDIUM > LOW ordering |
+| **Pre-flight tier check** | Tier 1 fast-rule gate; Tier 2 graph-gate risk assessment before full mutation |
+| **Archetype extractor** | Cosine-similarity classifier against 16 BAF seed vectors (59 features) |
+| **Mutation engine** | Generates 22 targeted evasion mutations per signal |
+| **Graph adversary** | Tests 5 Blue Team graph gates for structural bypass opportunities |
+| **Attack package builder** | Assembles TGEP-compatible graph, bypass strategy, and JSON export per evasion |
+| **KB feedback loop** | Updates mutation weights from historical evasion success rates |
+| **Self-generation loop** | Injects 3 random archetype signals every 5 minutes (configurable) |
 
 ---
 
-## The 3 Input Signal Types
+## Dataset Integration
 
-| Signal Type | Source | Priority | What Red Team does with it |
+### BAF NeurIPS 2022
+
+The archetype seeds are derived from the **BAF (Bank Account Fraud) dataset** — NeurIPS 2022 — using `Base.csv` (1 million real-world fraud transactions).
+
+Each of the 16 archetypes was produced by clustering fraud records along 59 behavioural features and computing centroid vectors. These seed vectors drive cosine-similarity classification at runtime.
+
+### Seed Storage
+
+| File | Purpose |
+|---|---|
+| `data/computed_archetype_seeds.json` | Raw BAF-derived 59-feature vectors for all 16 archetypes |
+| `app/engines/seed_library.py` | Runtime seed access: `get_seed()`, `get_all_seeds()`, `get_seed_with_variation(±10%)` |
+
+### Self-Generation Loop
+
+Every **5 minutes**, the worker automatically selects 3 random archetypes and injects synthetic `FraudDNA` signals derived from their seed vectors. This keeps the knowledge base active even without live Blue Team traffic.
+
+Controlled via `SELF_GENERATION_ENABLED` environment variable (default: `true`).
+
+### Bulk Load
+
+To immediately inject all 16 archetype seeds as synthetic signals:
+
+```bash
+python scripts/bulk_load_seeds.py
+```
+
+Or enable `BULK_LOAD_ON_STARTUP=true` to run this automatically at service startup.
+
+---
+
+## 16 Archetypes
+
+All archetypes are derived from BAF NeurIPS 2022 and encoded as 59-feature cosine-similarity seed vectors.
+
+| # | Name | TGEP Graph Pattern | Key Features |
 |---|---|---|---|
-| **FRAUD_DNA** | Blue Team POST /feedback confirmed fraud | HIGH | Extracts archetype → generates 10 mutations → scores each via shadow scorer → evaluates gate probes + SHAP sensitivity + context bypass → writes to KB |
-| **NOVELTY** | Blue Team IF queue escalation (10+ same fingerprint) | CRITICAL | Extracts archetype → runs all 5 gate adversary bypasses → writes 5 evasions to KB |
-| **GATE_MISS** | Investigator-confirmed false negative | MEDIUM | Runs graph adversary for that specific gate → writes 1 evasion to KB |
+| 1 | `digital_arrest` | 3→1→2 sink | `night_txn_ratio`, `hour_deviation` |
+| 2 | `structuring` | 3→1→2 sink | `amount_vs_threshold_50000`, `txn_count_30d` |
+| 3 | `rapid_layering` | 3→1→2 sink | `velocity_ratio`, `channel_entropy` |
+| 4 | `bipartite_mule` | 3→1→2 sink | `bipartite_score`, `distinct_payees_24h` |
+| 5 | `cycle_round_trip` | 3→1→2 sink | `cycle_membership`, `return_ratio` |
+| 6 | `cash_in_mule` | 3→1→2 sink | `cash_mule_sink_score`, `fan_out_ratio` |
+| 7 | `salary_mule` | 3→1→2 sink | `dormancy_break`, `account_age_days` |
+| 8 | `low_slow_mule` | 3→1→2 sink | `temporal_acceleration`, `txn_count_30d` |
+| 9 | `romance_scam` | 3→1→2 sink | `counterparty_novelty`, `pagerank_fraud_seeded` |
+| 10 | `pig_butchering` | 3→1→2 sink | `community_fraud_ratio`, `burst_score` |
+| 11 | `investment_fraud` | 3→1→2 sink | `velocity_ratio`, `amount_zscore` |
+| 12 | `account_takeover` | 3→1→2 sink | `channel_switch`, `geography_switch` |
+| 13 | `otp_fraud` | 3→1→2 sink | `velocity_ratio`, `burst_score` |
+| 14 | `sim_swap` | 3→1→2 sink | `night_txn_ratio`, `is_night` |
+| 15 | `ghost_node_cash` | 3→1→2 sink | `sink_score`, `fan_out_ratio` |
+| 16 | `merchant_terminal` | 3→1→2 sink | `channel_entropy`, `txn_count_last_1h` |
+
+Signals that do not match any archetype above the cosine threshold are classified as **`NEW_VARIANT`** and forwarded for manual triage.
 
 ---
 
-## The 10 Mutation Types
+## Confirmed Findings
 
-| Mutation | Feature Changed | What It Tests |
-|---|---|---|
-| threshold_amount_50k | amount_series_score, amount_vs_threshold_50000 | Structuring below ₹50K |
-| threshold_amount_100k | amount_vs_threshold_100000 | Structuring below ₹1L |
-| threshold_amount_1m | amount_vs_threshold_1000000 | Structuring below ₹10L PMLA threshold |
-| timing_day | night_txn_ratio 0.95→0.15 | Daytime disguise of night fraud |
-| velocity_20pct | burst_score -20%, velocity_ratio -2.8 | Slow velocity to evade burst gate |
-| velocity_30pct | burst_score -30%, velocity_ratio -2.8 | Slower velocity evasion |
-| velocity_40pct | burst_score -40%, velocity_ratio -2.8 | Maximum velocity reduction |
-| context_festival | is_festival_period=1 | Abuse ×0.70 festival multiplier |
-| context_senior | night_txn_ratio→0 | Remove senior+night ×1.50 trigger |
-| novelty_zero | counterparty_novelty=0 | Pretend payee is a known contact |
+Three Red Team findings have been confirmed and disclosed to the Blue Team. All are intelligence-grade — no automated action has been taken.
 
 ---
 
-## The 5 Gate Bypass Strategies
+### 🔴 Finding 1 — CRITICAL
 
-| Gate | Blue Team Detection | Red Team Bypass Strategy |
+**Archetype:** `cycle_round_trip`
+**Evasion ID:** `graph_bypass_nine_hop_linear`
+
+| Field | Detail |
+|---|---|
+| Gate bypassed | `cycle` |
+| Mechanism | 9-hop linear chain exceeds 8-hop detector range |
+| TGEP pattern detected | `circular_laundering` |
+| Recommended patch | Extend cycle gate from **8 hops → 10 hops** |
+
+**Description:** The Blue Team cycle gate uses a maximum path length of 8 hops. A 9-hop linear chain that doubles back terminates just outside the detector window, evading the `circular_laundering` TGEP flag entirely. The mutation engine discovered this bound via systematic `gate_defeat_cycle` mutations.
+
+---
+
+### 🟠 Finding 2 — HIGH
+
+**Archetype:** `digital_arrest`
+**Evasion ID:** `timing_day`
+
+| Field | Detail |
+|---|---|
+| Gate bypassed | `context_senior_night` |
+| Mechanism | 1.50× night multiplier not applied when transactions are spread across daytime hours |
+| TGEP pattern detected | `layering_chain` |
+| Recommended patch | Add 7-day rolling `night_txn_ratio` baseline to the context gate |
+
+**Description:** The `context_senior_night` gate applies a 1.50× risk multiplier only to transactions occurring during defined night hours. By shifting transaction timing to daytime while preserving all other digital-arrest behavioural features, the multiplier is never triggered. A rolling 7-day `night_txn_ratio` baseline would close this gap.
+
+---
+
+### 🔴 Finding 3 — CRITICAL
+
+**Archetype:** `ghost_node_cash`
+**Evasion ID:** `graph_bypass_sink_with_outflow`
+
+| Field | Detail |
+|---|---|
+| Gate bypassed | `sink` |
+| Mechanism | Inflow accumulation phase not flagged; only active outflows are checked |
+| TGEP pattern detected | *(none — no detector exists for accumulation-then-legitimate-spend)* |
+| Recommended patch | Add inflow/outflow ratio analysis to both the Blue Team `sink` gate and the TGEP detector suite |
+
+**Description:** The current sink gate monitors for fan-out above a threshold but does not track the ratio of inflow accumulation to eventual legitimate-looking outflows. A ghost node that accumulates funds over several days before dispersing them in transactions that individually appear legitimate evades both the gate and TGEP entirely. This is the most structurally significant finding to date.
+
+---
+
+## TGEP Graph Design
+
+All 17 archetype attack templates use a **confirmed-safe graph structure** validated on **2026-06-05** against the live TGEP detector suite.
+
+### Invariants
+
+| Constraint | Value | Rationale |
 |---|---|---|
-| Cycle | Circular paths 2-8 hops | Synthesise 9-hop path — outside detection range |
-| Sink | High retention + inflow concentration | Add small outflow transactions to reduce sink_score |
-| Bipartite | 7+ senders → 1 collector density >0.7 | Split senders into 4+3 batches, density drops below 0.7 |
-| Cash Mule Sink | Receive → ATM → digital silence | Insert 48h of small activity between receive and ATM |
-| Merchant Terminal | Round-trip through same POS | Route through 2 different POS terminals |
+| Inflow nodes | 3 institutional `CORP` accounts | Mimics realistic corporate payment flow |
+| Central node | 1 `ACC` account | Aggregation hub |
+| Outflow nodes | Max 2 | Below TGEP Fan-Out Network threshold (>2) |
+| Outflow value | ≤ 15% of total inflow | Avoids balance-drain anomaly detectors |
+| Max accounts per graph | 5 | Keeps graph within TGEP complexity limits |
+| Fan-out cap | 2 | Strictly below TGEP fan-out detector trigger |
+
+### Account Naming Convention
+
+| Role | Format | Example |
+|---|---|---|
+| Institutional inflow | `CORP{3-digit}` | `CORP042` |
+| Central aggregator | `ACC{6-digit}` | `ACC001337` |
+| Payroll-style outflow | `PAYROLL_VENDOR_{3-digit}` | `PAYROLL_VENDOR_007` |
+| Utility-style outflow | `UTIL_PROVIDER_{3-digit}` | `UTIL_PROVIDER_003` |
+
+### Example Safe Graph
+
+```
+CORP001 ──┐
+CORP002 ──┼──► ACC001337 ──► PAYROLL_VENDOR_001
+CORP003 ──┘               └──► UTIL_PROVIDER_002
+```
 
 ---
 
 ## API Reference
 
-All routes require `X-API-Key` header except `/health`.
-Rate limit: `500/minute` on `POST /red-team/ingest`.
+All endpoints (except `/health`) require the header:
 
-**POST /red-team/ingest**
-- **Auth**: X-API-Key
-- **Rate limit**: 500/min
-- **Input**: FraudDNA | NoveltyEscalation | GateMissLog (discriminated on source_type)
-- **Returns 202**: `{ingest_id, priority, queued_for}`
-- **Returns 503**: `{"detail": "queue_full"}` when all 4 queues at max capacity
-- **Returns 409**: duplicate transaction_id
-
-*FraudDNA schema:*
-```json
-{
-  "source_type": "FRAUD_DNA",
-  "transaction_id": "TXN_001",
-  "account_id": "ACC_123",
-  "confirmed_archetype": "digital_arrest",
-  "feature_vector": { ...up to 59 features... },
-  "shap_values": { ...top features... },
-  "timestamp": "2026-06-06T02:14:00Z"
-}
 ```
-
-*NoveltyEscalation schema:*
-```json
-{
-  "source_type": "NOVELTY",
-  "fingerprint_id": "fp_abc123",
-  "structural_features": { ...17 features... },
-  "occurrence_count": 15,
-  "escalated_at": "2026-06-06T..."
-}
+X-API-Key: {RED_TEAM_API_KEY}
 ```
-
-*GateMissLog schema:*
-```json
-{
-  "source_type": "GATE_MISS",
-  "transaction_id": "TXN_002",
-  "gate_name": "cycle",
-  "alert_id": "alert_xyz",
-  "missed_at": "2026-06-06T...",
-  "investigator_note": "circular pattern missed"
-}
-```
-
-**GET /red-team/report/{ingest_id}**
-- **Auth**: X-API-Key
-- **Returns**: full evasion analysis — all mutations tried, gate vulnerabilities, SHAP deltas, recommended action, tgep_webhook_status
-- **Returns 202** if still processing
-- **Returns 404** if not found
-
-**GET /red-team/evasions**
-- **Auth**: X-API-Key
-- **Query params**: severity (LOW|MEDIUM|HIGH|CRITICAL), archetype, gate, limit (default 20), offset
-- **Returns**: paginated list of evasion KB entries with full mutation vectors
-
-**GET /red-team/briefing**
-- **Auth**: X-API-Key
-- **Returns** human-readable developer intelligence:
-```json
-{
-  "threat_summary": "X evasion patterns. Y CRITICAL, Z HIGH.",
-  "immediate_action_required": [
-    {
-      "priority": 1,
-      "severity": "CRITICAL",
-      "title": "plain English title",
-      "what_was_found": "plain English explanation",
-      "what_to_change": "exact fix instruction",
-      "file": "blue_team file to change",
-      "evasion_ids": ["uuid"]
-    }
-  ],
-  "monitor": ["...HIGH severity..."],
-  "structural_findings": ["...LOW/MEDIUM — real findings, shadow scorer offline..."],
-  "top_exploitable_features": ["velocity_ratio", "burst_score", "night_txn_ratio"],
-  "context_multipliers_at_risk": ["festival_0.70x"],
-  "mutation_intelligence": {
-    "summary": "Shadow scorer offline — showing structural analysis only",
-    "top_exploitable_features": ["...with plain_english + recommendation..."],
-    "context_multipliers_tested": ["..."],
-    "archetype_confirmed": "...",
-    "tgep_payload_hint": "..."
-  }
-}
-```
-*Note: briefing works even when shadow scorer is offline — mutation_intelligence section provides structural analysis regardless of Blue Team connectivity.*
-
-**GET /health**
-- **No auth required**
-- **Returns**: `{"status": "ok", "service": "red-team"}`
-
-Interactive docs: http://localhost:8002/docs
 
 ---
 
-## Three Output Layers
+### `POST /red-team/ingest`
 
-**Layer 1 — GET /red-team/evasions**
-- **Audience**: data engineers, automated pipelines
-- **Content**: raw KB entries, filterable, all 40+ fields per evasion
-- **Use case**: bulk analysis, integration with other tools
+Enqueue a Blue Team confirmed-fraud signal for Red Team analysis.
 
-**Layer 2 — GET /red-team/report/{id}**
-- **Audience**: security engineers
-- **Content**: full analysis for one ingest — all 10 mutations, gate probes, SHAP deltas, recommended action
-- **Use case**: deep investigation of a specific confirmed fraud case
+**Request body** (union type — one of):
 
-**Layer 3 — GET /red-team/briefing**
-- **Audience**: Blue Team developers, product managers
-- **Content**: plain English — what to fix, which file, why it matters
-- **Use case**: daily briefing, what to patch this sprint
-- **Works offline**: mutation_intelligence section runs without Blue Team connected
-
----
-
-## Validated TGEP Test Results
-
-Date: June 5, 2026
-
-| Pattern | Mutations Applied | TGEP Result | Threat Level | Key Finding |
-|---|---|---|---|---|
-| digital_arrest | timing_day — shifted night_txn_ratio 0.95→0.15 | Hybrid Laundering 69%, Smurfing 48% | HIGH | Blue Team senior+night ×1.50 multiplier bypassed by timing shift. Graph still detectable. |
-| 9-hop cycle | graph_adversary cycle bypass — 9 hops vs Blue Team's 2-8 range | Circular Laundering 96%, Cross-Rail 67% | CRITICAL | Cycle gate has hard upper bound of 8 hops. 9-hop path completely bypasses Tier-2. |
-| 7-sender bipartite | graph_adversary bipartite split 4+3 | Fan-In Aggregation 59%, Hybrid Laundering 84% | HIGH | Density threshold at 0.7 bypassable by splitting sender batches. |
-
----
-
-## Three Confirmed Patch Proposals for Blue Team
-
-**PATCH 1 — Cycle Gate Upper Bound (CRITICAL)**
-- **Current**: cycle gate detects paths 2-8 hops
-- **Gap**: 9-hop circular path scored CRITICAL on TGEP, bypassed Blue Team entirely
-- **Fix**: extend cycle_membership nightly batch to check up to 10 hops
-- **File**: app/detection/tier2/cycle_gate.py
-
-**PATCH 2 — Senior+Night Multiplier Secondary Trigger (HIGH)**
-- **Current**: senior + night_txn_ratio > 0.5 triggers ×1.50 multiplier
-- **Gap**: shifting night_txn_ratio to 0.15 removes the multiplier entirely
-- **Fix**: add dormancy_reactivation_flag=1 as independent trigger regardless of night_txn_ratio
-- **File**: app/detection/context/indian_context.py
-
-**PATCH 3 — Bipartite Gate Density Threshold (HIGH)**
-- **Current**: bipartite gate fires at density > 0.7 with 7+ senders
-- **Gap**: splitting 7 senders into 4+3 batches reduces density below threshold
-- **Fix**: lower density threshold to 0.55 or add time-window aggregation across batches
-- **File**: app/detection/tier2/bipartite_gate.py
-
----
-
-## Security
-
-| Concern | Implementation |
+| Type | Description |
 |---|---|
-| Auth | X-API-Key header on all routes, checked via timing-safe comparison |
-| PII in logs | sha256(SALT + identifier)[:12] — account_id, transaction_id, fingerprint_id, alert_id never stored raw |
-| Rate limiting | 500/min on POST /red-team/ingest via slowapi (utils/limiter.py) |
-| Queue bounds | INGEST_QUEUE_MAX_SIZE=1000 — returns HTTP 503 when full |
-| SQL injection | Parameterized queries only |
-| Shadow scorer | BLUE_TEAM_SHADOW_URL defaults to empty — will not call itself |
-| Secrets | .env only, never committed |
-| Golden invariant | Red Team output is developer intelligence only — never automated blocking |
+| `FraudDNA` | Blue Team primary fraud signal |
+| `NoveltyEscalation` | Out-of-distribution escalation |
+| `GateMissLog` | Missed gate log from Blue Team |
+| `DatasetRecord` | Raw BAF-compatible record |
+
+**Responses:**
+
+| Status | Meaning |
+|---|---|
+| `202` | Accepted — `{ingest_id, priority, queued_for}` |
+| `409` | Conflict — duplicate signal already in queue |
+| `503` | Service Unavailable — priority queue at capacity |
 
 ---
 
-## How to Run Locally
+### `GET /red-team/report/{ingest_id}`
 
-Prerequisites: Python 3.11, Docker Desktop, Git
+Retrieve the full evasion analysis for a processed signal.
 
-**Step 1 — Clone and setup:**
+**Responses:**
+
+| Status | Meaning |
+|---|---|
+| `200` | Full evasion analysis report |
+| `404` | Ingest ID not found |
+
+---
+
+### `GET /red-team/evasions`
+
+Paginated listing of the evasion knowledge base.
+
+**Query parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `severity` | `string` | Filter by severity (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`) |
+| `archetype` | `string` | Filter by archetype name |
+| `gate` | `string` | Filter by bypassed gate name |
+| `limit` | `integer` | Page size (default: 20) |
+| `offset` | `integer` | Page offset (default: 0) |
+
+**Response:** `200` — paginated KB listing.
+
+---
+
+### `GET /red-team/briefing`
+
+Security briefing for developers and Blue Team leads.
+
+**Response:** `200`
+
+```json
+{
+  "immediate_action_required": [ ... ],
+  "structural_findings": [ ... ],
+  "mutation_intelligence": { ... }
+}
+```
+
+---
+
+### `GET /red-team/attack-graph/{ingest_id}`
+
+Retrieve the full attack package (all 22 evasion vectors) for a processed signal.
+
+**Responses:**
+
+| Status | Meaning |
+|---|---|
+| `200` | Complete — all 22 mutations processed, full packages returned |
+| `202` | Processing — `{status: "processing", evasions_so_far: N}` |
+| `404` | Ingest ID not found |
+
+---
+
+### `GET /health`
+
+Liveness check — **no authentication required**.
+
+**Response:** `200`
+
+```json
+{
+  "status": "ok",
+  "service": "red-team"
+}
+```
+
+---
+
+## Quickstart
+
+### 1. Install dependencies
+
 ```bash
-git clone <repo>
-cd bling-red-team/red-team
-python -m venv venv
-venv\Scripts\activate   # Windows
 pip install -r requirements.txt
 ```
 
-**Step 2 — Configure:**
+### 2. Configure environment
+
 ```bash
-copy .env.example .env
-# Edit .env — set RED_TEAM_API_KEY to something secure
+cp .env.example .env
+# Edit .env — at minimum, set RED_TEAM_API_KEY
 ```
 
-**Step 3 — Start infrastructure:**
+### 3. Start the service
+
 ```bash
-docker-compose up -d
+uvicorn app.main:app --port 8002
 ```
 
-**Step 4 — Run migrations:**
+### 4. Send a test signal
+
 ```bash
-alembic upgrade head
+curl -X POST http://localhost:8002/red-team/ingest \
+  -H 'X-API-Key: changeme' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "source_type": "FRAUD_DNA",
+    "account_id": "ACC001337",
+    "risk_score": 0.91,
+    "triggered_gates": ["cycle", "sink"],
+    "features": {}
+  }'
 ```
 
-**Step 5 — Start server:**
+### 5. Poll for the attack graph
+
 ```bash
-uvicorn app.main:app --reload --port 8002
+# Replace {ingest_id} with the ID returned above
+curl http://localhost:8002/red-team/attack-graph/{ingest_id} \
+  -H 'X-API-Key: changeme'
+# Returns 202 until all 22 mutations complete, then 200
 ```
 
-*OR use the convenience scripts from project root:*
-```bash
-Double-click start.ps1   # starts everything + opens browser
-Double-click stop.ps1    # stops everything cleanly
-```
+### 6. (Optional) Bulk-load all 16 archetype seeds
 
-**Step 6 — Verify:**
-- Open http://localhost:8002/health
-- Open http://localhost:8002/docs  ← interactive API explorer
-
-**Step 7 — Run tests:**
 ```bash
-pytest tests/ -v   # 127/127 passing
+python scripts/bulk_load_seeds.py
 ```
 
 ---
 
 ## Environment Variables
 
-| Variable | Description | Default / Example |
+| Variable | Default | Description |
 |---|---|---|
-| RED_TEAM_API_KEY | X-API-Key for all inbound requests | Required |
-| BLUE_TEAM_SHADOW_URL | Blue Team shadow scorer URL | Leave empty until Blue Team wired |
-| BLUE_TEAM_INGEST_URL | Blue Team main API base URL | Reference only |
-| TGEP_WEBHOOK_URL | TGEP webhook endpoint | Leave empty until TGEP wired |
-| POSTGRES_URL | Sync PostgreSQL URL for Alembic | postgresql://redteam:redteam@localhost:5433/redteam |
-| POSTGRES_ASYNC_URL | Async PostgreSQL URL for SQLAlchemy | postgresql+asyncpg://... |
-| REDIS_URL | Redis URL | redis://localhost:6380 |
-| APP_ENV | development / staging / production | development |
-| LOG_LEVEL | DEBUG / INFO / WARNING / ERROR | INFO |
-| INGEST_RATE_LIMIT | slowapi rate limit string | 500/minute |
-| INGEST_QUEUE_MAX_SIZE | max items across all 4 priority queues | 1000 |
-| PII_HASH_SALT | Salt for sha256 PII masking | Change in production |
+| `RED_TEAM_API_KEY` | `changeme` | `X-API-Key` value required on all authenticated endpoints |
+| `PII_HASH_SALT` | `red-team-salt-changeme` | Salt for `sha256(SALT+value)[:12]` PII masking before storage |
+| `BLUE_TEAM_SHADOW_API_KEY` | *(empty)* | Auth key for Blue Team shadow scorer integration |
+| `BLUE_TEAM_SHADOW_URL` | *(empty)* | Base URL of Blue Team shadow scorer (not yet connected) |
+| `BLUE_TEAM_INGEST_URL` | `http://localhost:8000/api/v1` | Blue Team ingest URL — reference only, not called at runtime |
+| `TGEP_BASE_URL` | *(required for live TGEP)* | Public API URL of the TGEP graph scoring service |
+| `TGEP_CLEAR_GRAPH_BETWEEN_ATTACKS` | `true` | Clear TGEP graph state before each attack package run |
+| `POSTGRES_URL` | `postgresql://...` | Postgres connection string — deferred post-hackathon |
+| `REDIS_URL` | `redis://...` | Redis connection string — deferred post-hackathon |
+| `INGEST_RATE_LIMIT` | `500/minute` | slowapi rate limit applied to the ingest endpoint |
+| `INGEST_QUEUE_MAX_SIZE` | `1000` | Per-tier queue capacity cap; returns `503` when full |
+| `SELF_GENERATION_ENABLED` | `true` | Enable auto self-generation loop (3 archetypes every 5 min) |
+| `BULK_LOAD_ON_STARTUP` | `false` | Inject all 16 archetype seeds as signals at service startup |
+
+> [!WARNING]
+> Change `RED_TEAM_API_KEY` and `PII_HASH_SALT` before any deployment outside localhost. The defaults are intentionally weak and for local development only.
 
 ---
 
-## File Map
+## Testing
 
-```text
-app/main.py — FastAPI app, lifespan, worker startup, CORS, rate limit handler
-app/config.py — pydantic-settings, all env vars, cached singleton
-app/api/ingest.py — POST /red-team/ingest, rate limit decorator
-app/api/report.py — GET /red-team/report/{id}
-app/api/evasions.py — GET /red-team/evasions, paginated KB query
-app/api/briefing.py — GET /red-team/briefing, human-readable intelligence
-app/api/tgep_webhook.py — outbound webhook to TGEP (no inbound routes)
-app/ingest/router.py — dedup, PII sanitization, priority queue assignment
-app/ingest/schemas.py — FraudDNA, NoveltyEscalation, GateMissLog pydantic models
-app/engines/archetype_extractor.py — cosine similarity → 16 archetypes or NEW_VARIANT
-app/engines/mutation_engine.py — generates 10 mutations per fraud signal
-app/engines/graph_adversary.py — 5 gate bypass strategies
-app/sandbox/shadow_scorer.py — httpx client to Blue Team shadow endpoint
-app/sandbox/evaluators.py — gate_probe, feature_sensitivity, context_bypass
-app/knowledge/kb_store.py — append-only evasion knowledge base (WARNING: in-memory)
-app/worker/pipeline.py — background asyncio.Task, consumes queue, runs full pipeline
-app/utils/auth.py — timing-safe X-API-Key check
-app/utils/audit_logger.py — structlog, hash_id() for PII masking
-app/utils/limiter.py — shared slowapi Limiter singleton
-ml/similarity.py — cosine similarity for archetype matching
-alembic/versions/001_initial_schema.py — 3 tables: ingest_log, evasion_kb, red_team_reports
-docs/red_team_architecture.drawio — draw.io architecture diagram
-docs/red_team_architecture.svg — SVG export for README embedding
+Run the full test suite:
+
+```bash
+pytest
 ```
 
----
+Expected result: **155 / 155 passed**.
 
-## Database Schema
+### Test File Reference
 
-Three tables:
+| File | Tests | Coverage Area |
+|---|---|---|
+| `tests/test_ingest.py` | 14 | Ingest endpoint validation, priority assignment, deduplication |
+| `tests/test_mutation.py` | 15 | All 22 mutation types — single-feature, compound, tier-aware |
+| `tests/test_graph_adversary.py` | 15 | 5 gate bypass checks (cycle, sink, bipartite, cash_mule, merchant) |
+| `tests/test_sandbox.py` | 12 | Mutation sandbox isolation and rollback |
+| `tests/test_worker.py` | 18 | Priority queue ordering, background worker lifecycle |
+| `tests/test_briefing.py` | 25 | Briefing endpoint content and severity classification |
+| `tests/test_tgep_contracts.py` | 20 | TGEP graph structure invariants and API contracts |
+| `tests/test_tier_bypass.py` | 10 | Tier 1 / Tier 2 pre-flight gate logic |
+| `tests/test_attack_package.py` | 6 | Attack package builder output structure |
+| `tests/test_seed_library.py` | 7 | Seed library access, variation bounds, all 16 archetypes |
+| `tests/test_sparse_payload_mutations.py` | 3 | Mutations on minimal/sparse feature payloads |
+| `tests/test_security_and_queues.py` | 10 | Auth enforcement, rate limits, queue capacity |
+| **Total** | **155** | |
 
-- **ingest_log** — every incoming signal
-  `id, source_type (FRAUD_DNA|NOVELTY|GATE_MISS), raw_payload (sanitized jsonb), received_at, status (QUEUED|IN_PROGRESS|COMPLETED|FAILED), transaction_id_hash (SHA-256 dedup key, no raw IDs stored)`
+### Running a specific test module
 
-- **evasion_kb** — append-only, never updated or deleted
-  `id, archetype, evasion_vector jsonb, gate_bypassed text[], feature_deltas jsonb, context_multiplier_abused, severity, evasion_success, score_original, score_mutated, mutation_type, gate_probe_result jsonb, feature_sensitivity_result jsonb, context_bypass_result jsonb, ingest_log_id (FK), created_at`
-
-- **red_team_reports** — one per evasion batch
-  `id, report_type (GATE_PATCH|NEW_ARCHETYPE|CONTEXT_ABUSE), payload jsonb, recommended_action (PATCH|MONITOR|ACCEPT), tgep_webhook_sent bool, created_at`
-
-**Ports (no conflicts with Blue Team):**
-- Red Team API: 8002 | Blue Team API: 8000
-- Red Team PostgreSQL: 5433 | Blue Team PostgreSQL: 5432
-- Red Team Redis: 6380 | Blue Team Redis: 6379
-
----
-
-## Tech Stack
-
-- **FastAPI 0.111** | API framework
-- **PostgreSQL 15** | Primary database (schema ready, persistence deferred)
-- **Redis 7** | Queue/cache (configured, persistence deferred)
-- **scikit-learn** | Cosine similarity for archetype matching only
-- **httpx** | Shadow scorer client + TGEP outbound webhook
-- **structlog** | Structured logging with PII masking
-- **slowapi** | Rate limiting
-- **Docker + Docker Compose** | Infrastructure
-- **pytest** | 127/127 tests passing
-
----
-
-## Integration with Blue Team and TGEP (deferred)
-
-### A. Blue Team → Red Team (confirmed fraud)
-Add one httpx call in Blue Team `feedback.py` after blockchain seal.
-
-```python
-async def notify_red_team(fraud_dna: dict):
-    async with httpx.AsyncClient() as client:
-        try:
-            await client.post(
-                f"{settings.RED_TEAM_URL}/red-team/ingest",
-                json={
-                    "source_type": "FRAUD_DNA",
-                    "transaction_id": fraud_dna["transaction_id"],
-                    "account_id": fraud_dna["account_id"],
-                    "confirmed_archetype": fraud_dna["archetype"],
-                    "feature_vector": fraud_dna["feature_vector"],
-                    "shap_values": fraud_dna["shap_values"],
-                    "timestamp": fraud_dna["timestamp"]
-                },
-                headers={"X-API-Key": settings.RED_TEAM_API_KEY},
-                timeout=3.0
-            )
-        except Exception:
-            pass  # Red Team is non-critical — never block Blue Team on failure
+```bash
+pytest tests/test_mutation.py -v
 ```
 
-Add to Blue Team `.env`:
-```env
-RED_TEAM_URL=http://red-team:8002
-RED_TEAM_API_KEY=changeme
-```
+### Running by marker
 
-### B. Blue Team shadow scorer
-Blue Team must expose one new read-only endpoint:
-**POST /api/v1/shadow/score**
-- Auth: INTERNAL_API_KEY only
-- Behaviour: identical to `/api/v1/score` but writes nothing to DB, fires no alerts
-- Point Red Team `BLUE_TEAM_SHADOW_URL` at this endpoint.
-
-### C. Red Team → TGEP webhook
-- Find the exact webhook path on `transaction-graph-engine.vercel.app`
-- Set in Red Team `.env`: `TGEP_WEBHOOK_URL=https://transaction-graph-engine.vercel.app/[path]`
-- Red Team fires automatically for HIGH/CRITICAL severity evasions.
-
-Webhook payload format:
-```json
-{
-  "source": "red_team",
-  "report_id": "uuid",
-  "event_type": "EVASION_CONFIRMED",
-  "archetype": "digital_arrest",
-  "gate_vulnerability": "cycle",
-  "proposed_patch_summary": "...",
-  "severity": "HIGH",
-  "recommended_action": "PATCH",
-  "created_at": "..."
-}
+```bash
+pytest -m critical      # CRITICAL-severity evasion tests only
+pytest -m graph         # Graph adversary tests only
 ```
 
 ---
 
 ## Known Limitations
 
-**WARNING: PROTOTYPE STATUS**
-- **In-memory only**: `_queues`, `_seen_hashes`, `_ingest_log` (router.py) and `_evasion_kb` (kb_store.py) are in-memory. Data is lost on server restart.
-- **Single process only**: not safe for multi-worker deployment
-- Postgres schema exists and migrations run, but runtime does not persist to DB yet
-- Redis is configured but not used for queue durability yet
-- Persistence to Postgres/Redis is deferred post-hackathon
+> [!NOTE]
+> These limitations are intentional scope decisions for the hackathon prototype. Production readiness items are tracked separately.
 
-**Shadow scorer offline**:
-- When `BLUE_TEAM_SHADOW_URL` is empty, `score_original=0` and `score_mutated=null`
-- All severities show as LOW in this state
-- `mutation_intelligence` section of `/briefing` still provides full structural analysis regardless of shadow scorer status
+| Limitation | Impact | Post-Hackathon Plan |
+|---|---|---|
+| **In-memory stores only** | All signals, KB entries, and evasion packages are lost on restart | Migrate to Postgres (evasion KB) + Redis (queue state) |
+| **Blue Team shadow scorer not connected** | Shadow scores always return `null` in evasion packages | Wire up once `BLUE_TEAM_SHADOW_URL` is available |
+| **TGEP_BASE_URL required from teammates** | Without it, TGEP graph scoring falls back to mock responses | Coordinate URL with TGEP team at integration milestone |
+| **Single-process only** | Cannot horizontally scale; one worker, one queue | Move to distributed queue (Redis Streams or Celery) post-hackathon |
 
 ---
 
-## What Red Team Does NOT Do
+## Security
 
-- Does not score live transactions
-- Does not block or delay any transaction
-- Does not write to Blue Team's database
-- Does not auto-apply any patch proposal
-- Does not store raw account IDs, transaction IDs, or VPAs anywhere
-- Does not call production Blue Team scorer (shadow only)
-- Does not make irreversible decisions of any kind
+### Authentication
+
+All endpoints (except `/health`) require a **timing-safe** `X-API-Key` comparison using `hmac.compare_digest`. This prevents timing-oracle attacks against the API key.
+
+### PII Masking
+
+Any PII fields (account IDs, counterparty references, etc.) are hashed before storage using:
+
+```
+sha256(PII_HASH_SALT + raw_value)[:12]
+```
+
+The truncated digest is stored; the original value is never persisted.
+
+### Rate Limiting
+
+The ingest endpoint is rate-limited to **500 requests / minute** via [slowapi](https://github.com/laurentS/slowapi). Requests exceeding this return `429 Too Many Requests`.
+
+### Golden Invariant
+
+> [!CAUTION]
+> **Red Team output is developer intelligence only.**
+> It must **never** be connected to automated transaction blocking, customer-facing decisions, or any operational risk system. Violations of this invariant are a security incident.
 
 ---
 
-*BLING Hackathon · Red Team · Union Bank of India*  
-*Adversarial fraud simulation with graph intelligence*  
-*Post-transaction · Developer intelligence only · Never automated blocking*
+*Generated: 2026-06-25 | BLING Hackathon — Red Team Service*
