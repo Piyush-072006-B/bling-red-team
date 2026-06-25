@@ -114,6 +114,15 @@ class Settings(BaseSettings):
         description="Number of archetypes to generate per cycle",
     )
 
+    # ── Bulk seed loader ─────────────────────────────────────────
+    bulk_load_on_startup: bool = Field(
+        default=False,
+        description=(
+            "If True, inject all 16 archetype seeds into the pipeline at startup "
+            "via scripts/bulk_load_seeds.py. Pre-populates KB before self-gen cycles run."
+        ),
+    )
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

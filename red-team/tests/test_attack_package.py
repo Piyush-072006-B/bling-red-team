@@ -31,18 +31,17 @@ SAMPLE_EVASION = {
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def test_evasion_to_tgep_graph_digital_arrest_has_4_hops():
-    """digital_arrest graph must have exactly 4 chain edges (+ 2 decoys = 6 total)."""
+def test_evasion_to_tgep_graph_digital_arrest_has_5_edges():
+    """digital_arrest graph must have exactly 5 edges (3 inflows + 2 outflows)."""
     edges = evasion_to_tgep_graph(SAMPLE_EVASION, "digital_arrest")
-    # 4 chain hops + 2 sub-threshold decoy transfers
-    assert len(edges) == 6
+    assert len(edges) == 5
 
 
-def test_evasion_to_tgep_graph_structuring_has_7_receivers():
-    """structuring graph must have 7 distinct receivers."""
+def test_evasion_to_tgep_graph_structuring_has_5_edges():
+    """structuring graph must have exactly 5 edges (3 inflows + 2 outflows)."""
     evasion = {"evasion_vector": {"avg_txn_amount_30d": 45000.0}}
     edges = evasion_to_tgep_graph(evasion, "structuring")
-    assert len(edges) == 7
+    assert len(edges) == 5
     to_accounts = {e["to_account"] for e in edges}
     assert len(to_accounts) > 0
 

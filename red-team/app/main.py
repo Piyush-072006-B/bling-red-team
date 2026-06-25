@@ -70,6 +70,12 @@ async def lifespan(app: FastAPI):
     )
     log.info("self_gen_task_started")
 
+    # Bulk-load archetype seeds on startup if configured
+    if settings.bulk_load_on_startup:
+        from scripts.bulk_load_seeds import run_bulk_load
+        asyncio.create_task(run_bulk_load(), name="red_team_bulk_load")
+        log.info("bulk_load_task_started")
+
     yield
 
     # Graceful shutdown: cancel both tasks and wait for them to finish

@@ -3,7 +3,7 @@
 ## STATUS
 PHASE: DEPLOYMENT_PENDING
 
-LAST_COMPLETED_TASK: Fixed timing issue in GET /red-team/attack-graph/{id} returning 404 before background worker finishes mutations. Now returns 202 Accepted while processing. Fixed tests broken by previous graph rename.
+LAST_COMPLETED_TASK: Task A — Reduced all 17 graph templates to confirmed-safe structure (3 inflows → 1 central → 2 outflows, ≤15% outflow, ≤5 accounts) to evade TGEP Fan-Out detector. Task B — Added scripts/bulk_load_seeds.py + BULK_LOAD_ON_STARTUP config to pre-populate KB immediately at startup.
 NEXT_TASK: Paste all 17 new archetype graphs into TGEP and verify all are undetected
 BLOCKING_ISSUE: none
 TESTS_PASSING: 155/155
