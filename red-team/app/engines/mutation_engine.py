@@ -322,14 +322,16 @@ def generate_mutations(
 
     # Apply KB feedback weights — sort by descending weight so historically
     # successful mutations float to the front of the candidate list.
+    top_weighted: list[str] = []
     try:
-        from app.engines.kb_feedback import get_mutation_weights
+        from app.engines.kb_feedback import get_mutation_weights, get_top_mutations
         weights = get_mutation_weights()
         if weights:
             mutations.sort(
                 key=lambda m: weights.get(m.get("mutation_type", ""), 1.0),
                 reverse=True,
             )
+            top_weighted = get_top_mutations(n=3)
     except Exception:
         pass  # KB feedback is best-effort; never block mutation generation
 
@@ -347,8 +349,10 @@ def generate_mutations(
         archetype=archetype,
         requested=n,
         produced=len(result),
+        top_kb_weighted=top_weighted,
     )
     return result
+
 
 
 

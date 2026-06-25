@@ -1,9 +1,9 @@
 # HANDOFF.md — Red Team Build State
 
 ## STATUS
-PHASE: PROTOTYPE_COMPLETE
-LAST_COMPLETED_TASK: Emergency completion sprint — record_findings.py, export_all_tgep_graphs.py, kb_feedback.py, KB feedback wired into mutation_engine.py, README.md rewritten, all_tgep_graphs.json generated.
-NEXT_TASK: Wire Blue Team shadow scorer and TGEP Render URL from teammates
+PHASE: HACKATHON READY
+LAST_COMPLETED_TASK: Final completion sprint — record_findings.py (3 confirmed findings), kb_feedback.py + get_top_mutations(), mutation_engine.py top_kb_weighted log, README.md final rewrite. 155/155 tests.
+NEXT_TASK: Wire Blue Team shadow scorer + TGEP Render URL from teammates
 BLOCKING_ISSUE: none
 TESTS_PASSING: 155/155
 DEPLOYMENT_STATUS: PROTOTYPE — single process, in-memory stores, data lost on restart. Persistence deferred post-hackathon.
