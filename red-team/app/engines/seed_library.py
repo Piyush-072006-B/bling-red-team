@@ -6,13 +6,14 @@ BAF NeurIPS 2022 + PaySim fraud dataset statistics. Used when no Blue Team
 signal is available so Red Team can self-generate adversarial patterns.
 """
 
-from __future__ import annotations
-
 import copy
+import json
 import random
+from pathlib import Path
 from typing import Any
 
-from app.engines.seed_data import ARCHETYPE_SEEDS
+_DATA_FILE = Path(__file__).resolve().parent.parent.parent / "data" / "seed_data.json"
+ARCHETYPE_SEEDS: dict[str, dict[str, float]] = json.loads(_DATA_FILE.read_text(encoding="utf-8"))
 
 
 def get_seed(archetype: str) -> dict[str, float]:

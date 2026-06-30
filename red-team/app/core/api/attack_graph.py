@@ -14,8 +14,8 @@ from fastapi.responses import JSONResponse
 from app.ingest.router import get_ingest_log
 from app.knowledge.kb_store import query_evasions
 from app.outputs.attack_package import build_attack_package, package_to_json_file
-from app.utils.audit_logger import get_logger
-from app.utils.auth import require_api_key
+from app.core.utils.audit_logger import get_logger
+from app.core.utils.auth import require_api_key
 
 log = get_logger(__name__)
 

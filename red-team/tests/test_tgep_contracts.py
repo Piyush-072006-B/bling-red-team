@@ -153,7 +153,7 @@ class TestMaybeFirTgepContract:
     @pytest.mark.asyncio
     async def test_fires_for_critical_patch(self):
         """fire_tgep_webhook must be called when severity=CRITICAL + PATCH."""
-        from app.api.tgep_webhook import maybe_fire_tgep_for_report
+        from app.core.api.tgep_webhook import maybe_fire_tgep_for_report
         report = {
             "id": "rpt-c1",
             "severity": "CRITICAL",
@@ -167,7 +167,7 @@ class TestMaybeFirTgepContract:
             },
         }
         with patch(
-            "app.api.tgep_webhook.fire_tgep_webhook",
+            "app.core.api.tgep_webhook.fire_tgep_webhook",
             new_callable=AsyncMock,
             return_value={},
         ) as mock_fire:
@@ -177,7 +177,7 @@ class TestMaybeFirTgepContract:
     @pytest.mark.asyncio
     async def test_fires_for_high_patch(self):
         """fire_tgep_webhook must be called when severity=HIGH + PATCH."""
-        from app.api.tgep_webhook import maybe_fire_tgep_for_report
+        from app.core.api.tgep_webhook import maybe_fire_tgep_for_report
         report = {
             "id": "rpt-h1",
             "severity": "HIGH",
@@ -191,7 +191,7 @@ class TestMaybeFirTgepContract:
             },
         }
         with patch(
-            "app.api.tgep_webhook.fire_tgep_webhook",
+            "app.core.api.tgep_webhook.fire_tgep_webhook",
             new_callable=AsyncMock,
             return_value=True,
         ) as mock_fire:
@@ -201,7 +201,7 @@ class TestMaybeFirTgepContract:
     @pytest.mark.asyncio
     async def test_does_not_fire_for_medium(self):
         """fire_tgep_webhook must NOT be called for MEDIUM severity."""
-        from app.api.tgep_webhook import maybe_fire_tgep_for_report
+        from app.core.api.tgep_webhook import maybe_fire_tgep_for_report
         report = {
             "id": "rpt-m1",
             "severity": "MEDIUM",
@@ -211,7 +211,7 @@ class TestMaybeFirTgepContract:
                         "gate_vulnerabilities": [], "gate_vulnerability": None},
         }
         with patch(
-            "app.api.tgep_webhook.fire_tgep_webhook",
+            "app.core.api.tgep_webhook.fire_tgep_webhook",
             new_callable=AsyncMock,
         ) as mock_fire:
             result = await maybe_fire_tgep_for_report(report)
@@ -221,7 +221,7 @@ class TestMaybeFirTgepContract:
     @pytest.mark.asyncio
     async def test_does_not_fire_for_low(self):
         """fire_tgep_webhook must NOT be called for LOW severity."""
-        from app.api.tgep_webhook import maybe_fire_tgep_for_report
+        from app.core.api.tgep_webhook import maybe_fire_tgep_for_report
         report = {
             "id": "rpt-l1",
             "severity": "LOW",
@@ -231,7 +231,7 @@ class TestMaybeFirTgepContract:
                         "gate_vulnerabilities": [], "gate_vulnerability": None},
         }
         with patch(
-            "app.api.tgep_webhook.fire_tgep_webhook",
+            "app.core.api.tgep_webhook.fire_tgep_webhook",
             new_callable=AsyncMock,
         ) as mock_fire:
             result = await maybe_fire_tgep_for_report(report)
@@ -241,7 +241,7 @@ class TestMaybeFirTgepContract:
     @pytest.mark.asyncio
     async def test_does_not_fire_when_accept_action(self):
         """fire_tgep_webhook must NOT be called when recommended_action=ACCEPT even for HIGH."""
-        from app.api.tgep_webhook import maybe_fire_tgep_for_report
+        from app.core.api.tgep_webhook import maybe_fire_tgep_for_report
         report = {
             "id": "rpt-a1",
             "severity": "HIGH",
@@ -251,7 +251,7 @@ class TestMaybeFirTgepContract:
                         "gate_vulnerabilities": [], "gate_vulnerability": None},
         }
         with patch(
-            "app.api.tgep_webhook.fire_tgep_webhook",
+            "app.core.api.tgep_webhook.fire_tgep_webhook",
             new_callable=AsyncMock,
         ) as mock_fire:
             result = await maybe_fire_tgep_for_report(report)
@@ -261,8 +261,8 @@ class TestMaybeFirTgepContract:
     @pytest.mark.asyncio
     async def test_fire_tgep_skips_low_severity_directly(self):
         """fire_tgep_webhook itself must return False for LOW without firing HTTP."""
-        from app.api.tgep_webhook import fire_tgep_webhook
-        with patch("app.api.tgep_webhook.httpx.AsyncClient") as mock_client:
+        from app.core.api.tgep_webhook import fire_tgep_webhook
+        with patch("app.core.api.tgep_webhook.httpx.AsyncClient") as mock_client:
             result = await fire_tgep_webhook(
                 report_id="rpt-low",
                 archetype="structuring",
@@ -277,8 +277,8 @@ class TestMaybeFirTgepContract:
     @pytest.mark.asyncio
     async def test_fire_tgep_skips_medium_severity_directly(self):
         """fire_tgep_webhook itself must return False for MEDIUM without firing HTTP."""
-        from app.api.tgep_webhook import fire_tgep_webhook
-        with patch("app.api.tgep_webhook.httpx.AsyncClient") as mock_client:
+        from app.core.api.tgep_webhook import fire_tgep_webhook
+        with patch("app.core.api.tgep_webhook.httpx.AsyncClient") as mock_client:
             result = await fire_tgep_webhook(
                 report_id="rpt-med",
                 archetype="structuring",

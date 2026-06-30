@@ -36,7 +36,7 @@ async def _bulk_load(seeds_path: Path) -> list[str]:
     """
     from app.ingest.router import ingest_signal, DuplicateIngestError, QueueFullError
     from app.ingest.schemas import FraudDNA
-    from app.utils.audit_logger import get_logger
+    from app.core.utils.audit_logger import get_logger
 
     log = get_logger("bulk_load_seeds")
 

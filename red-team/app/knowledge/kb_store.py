@@ -24,7 +24,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from app.utils.audit_logger import get_logger
+from app.core.utils.audit_logger import get_logger
 
 log = get_logger(__name__)
 

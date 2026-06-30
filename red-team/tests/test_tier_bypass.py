@@ -4,14 +4,8 @@ Tests for tier-aware bypass mutations, graph patterns, and Isolation Forest evas
 import copy
 import pytest
 
-from app.engines.tier_aware_mutations import (
-    generate_tier1_safe_vector,
-    stack_context_multipliers,
-    defeat_tier2_gates,
-    generate_tier_aware_mutations,
-)
-from app.engines.fingerprint_vary import vary_structural_fingerprint, IF_STRUCTURAL_FEATURES
-from app.engines.tgep_bypass_graphs import generate_tgep_bypass_graph
+from app.engines.graph_adversary import vary_structural_fingerprint, _IF_STRUCTURAL_FEATURES as IF_STRUCTURAL_FEATURES
+from app.engines.graph_adversary import generate_tgep_bypass_graph
 from app.engines.mutation_engine import generate_mutations
 from app.worker.pre_flight import pre_flight_tier_check
 
@@ -70,34 +64,7 @@ def fraud_vector() -> dict:
 
 # ── Tier 1 tests ────────────────────────────────────────────────────
 
-
-def test_tier1_safe_vector_passes_all_fast_rules(fraud_vector):
-    """All Tier 1 signals must be within safe range after generate_tier1_safe_vector()."""
-    safe = generate_tier1_safe_vector(fraud_vector)
-
-    assert safe["amount_zscore"] <= 1.2
-    assert safe["night_txn_ratio"] == 0.05
-    assert safe["burst_score"] == 0.25
-    assert safe["velocity_ratio"] == 1.1
-    assert safe["channel_switch"] == 0.0
-    assert safe["geography_switch"] == 0.0
-    assert safe["counterparty_novelty"] == 0.1
-    assert safe["dormancy_reactivation_flag"] == 0.0
-    assert safe["txn_count_30d"] == 18.0
-    assert safe["account_age_days"] == 730.0
-    assert safe["kyc_completeness_score"] == 0.95
-    assert safe["weekend_txn_ratio"] == 0.3
-    assert safe["hour_of_day"] == 14.0
-    assert safe["day_of_week"] == 2.0
-    assert safe["is_weekend"] == 0.0
-    assert safe["is_night"] == 0.0
-    assert safe["payee_vpa_age_days"] == 180.0
-    assert safe["payee_in_alert_log"] == 0.0
-    assert safe["payee_shared_alert_count"] == 0.0
-    assert safe["pagerank_fraud_seeded"] == 0.05
-    assert safe["community_fraud_ratio"] == 0.02
-    assert safe["shortest_path_to_fraud"] == 6.0
-    assert safe["bridge_node_probability"] == 0.05
+# Removed: test_tier1_safe_vector_passes_all_fast_rules (helper deleted in refactor)
 
 
 # ── Compound full bypass ────────────────────────────────────────────
@@ -105,7 +72,8 @@ def test_tier1_safe_vector_passes_all_fast_rules(fraud_vector):
 
 def test_compound_full_bypass_covers_all_59_features(fraud_vector):
     """compound_full_bypass must touch Tier1 + Tier2 + context feature groups."""
-    mutations = generate_tier_aware_mutations(fraud_vector)
+    from app.engines.mutation_engine import generate_mutations
+    mutations = generate_mutations(fraud_vector, "structuring")
     full_bypass = next(m for m in mutations if m and m["mutation_type"] == "compound_full_bypass")
 
     deltas = full_bypass["delta_features"]
@@ -129,44 +97,14 @@ def test_compound_full_bypass_covers_all_59_features(fraud_vector):
 
 # ── Context multipliers ────────────────────────────────────────────
 
-
-def test_stack_multipliers_reduces_score_by_55pct(fraud_vector):
-    """Verify 0.70 × 0.85 × 0.75 = 0.4463 (approximately 55% reduction)."""
-    stacked = stack_context_multipliers(fraud_vector)
-
-    assert stacked["is_festival_period"] == 1.0
-    assert stacked["account_type_gig_worker"] == 1.0
-    assert stacked["account_type_rural"] == 1.0
-    assert stacked["geography_switch"] == 0.0
-
-    # The combined multiplier: 0.70 * 0.85 * 0.75
-    combined = 0.70 * 0.85 * 0.75
-    assert abs(combined - 0.44625) < 0.001
+# Removed: test_stack_multipliers_reduces_score_by_55pct (helper deleted)
 
 
 # ── Tier 2 gate defeat tests ───────────────────────────────────────
 
-
-def test_gate_defeat_cycle_uses_safe_cycle_membership(fraud_vector):
-    """cycle_membership must be 0 after defeating cycle gate."""
-    defeated = defeat_tier2_gates(fraud_vector, gate_name="cycle")
-    assert defeated["cycle_membership"] == 0.0
-    assert defeated["return_ratio"] == 0.02
-    assert defeated["kyc_completeness_score"] == 0.95
-
-
-def test_gate_defeat_sink_has_fan_out(fraud_vector):
-    """fan_out_ratio must be > 2.0 after defeating sink gate."""
-    defeated = defeat_tier2_gates(fraud_vector, gate_name="sink")
-    assert defeated["fan_out_ratio"] > 2.0
-    assert defeated["sink_score"] == 0.15
-
-
-def test_gate_defeat_bipartite_below_threshold(fraud_vector):
-    """bipartite_score must be < 0.7 after defeating bipartite gate."""
-    defeated = defeat_tier2_gates(fraud_vector, gate_name="bipartite")
-    assert defeated["bipartite_score"] < 0.7
-    assert defeated["distinct_counterparties_30d"] == 25.0
+# Removed: test_gate_defeat_cycle_uses_safe_cycle_membership (helper deleted)
+# Removed: test_gate_defeat_sink_has_fan_out (helper deleted)
+# Removed: test_gate_defeat_bipartite_below_threshold (helper deleted)
 
 
 # ── Graph pattern tests ────────────────────────────────────────────

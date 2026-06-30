@@ -12,7 +12,7 @@ Returns: {"archetype": str, "similarity": float, "all_scores": dict[str, float]}
 from __future__ import annotations
 
 from ml.similarity import cosine_sim, normalise_vector
-from app.utils.audit_logger import get_logger
+from app.core.utils.audit_logger import get_logger
 
 log = get_logger(__name__)
 

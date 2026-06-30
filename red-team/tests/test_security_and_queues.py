@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 
 from app.ingest.router import (
     _ingest_log,
-    _queues,
+    _queue,
     reset_state,
 )
 from app.knowledge.kb_store import reset_kb
@@ -152,10 +152,10 @@ class TestPIISanitization:
 
 class TestBoundedQueues:
     def test_503_when_queue_full(self, client):
-        """When the HIGH queue is full, POST /red-team/ingest should return 503."""
-        # Replace HIGH queue with a maxsize=1 queue so we can fill it cheaply
-        original_q = _queues["HIGH"]
-        _queues["HIGH"] = asyncio.Queue(maxsize=1)
+        """When the queue is full, POST /red-team/ingest should return 503."""
+        import app.ingest.router
+        original_q = app.ingest.router._queue
+        app.ingest.router._queue = asyncio.PriorityQueue(maxsize=1)
 
         try:
             # First item fills the queue (no worker to drain it in this test context)
@@ -171,12 +171,13 @@ class TestBoundedQueues:
             )
             assert r2.json()["detail"]["error"] == "queue_full"
         finally:
-            _queues["HIGH"] = original_q
+            app.ingest.router._queue = original_q
 
     def test_503_rolls_back_ingest_log_entry(self, client):
         """On queue-full, the ingest_log entry must be rolled back (no phantom entries)."""
-        original_q = _queues["HIGH"]
-        _queues["HIGH"] = asyncio.Queue(maxsize=1)
+        import app.ingest.router
+        original_q = app.ingest.router._queue
+        app.ingest.router._queue = asyncio.PriorityQueue(maxsize=1)
 
         try:
             # Fill queue with first item
@@ -193,12 +194,13 @@ class TestBoundedQueues:
                 "ingest_log entry was not rolled back on queue-full"
             )
         finally:
-            _queues["HIGH"] = original_q
+            app.ingest.router._queue = original_q
 
     def test_503_rolls_back_dedup_hash(self, client):
         """On queue-full, the dedup hash must be rolled back so retry succeeds."""
-        original_q = _queues["HIGH"]
-        _queues["HIGH"] = asyncio.Queue(maxsize=1)
+        import app.ingest.router
+        original_q = app.ingest.router._queue
+        app.ingest.router._queue = asyncio.PriorityQueue(maxsize=1)
 
         try:
             # Fill queue
@@ -210,11 +212,11 @@ class TestBoundedQueues:
             assert r.status_code == 503
 
             # Drain the queue to make room, then retry — should now succeed (not 409)
-            _queues["HIGH"].get_nowait()
+            app.ingest.router._queue.get_nowait()
 
             r2 = client.post("/red-team/ingest", json=payload2, headers=_HEADERS)
             assert r2.status_code == 202, (
                 f"Retry after rollback should succeed (not 409 duplicate), got {r2.status_code}"
             )
         finally:
-            _queues["HIGH"] = original_q
+            app.ingest.router._queue = original_q

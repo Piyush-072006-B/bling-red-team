@@ -1,34 +1,8 @@
 """
-API Router — GET /red-team/briefing
-=====================================
-Returns a single human-readable JSON intelligence briefing synthesised from
-the entire evasion knowledge base.  Designed to be consumed directly by a
-Blue Team developer with zero context — plain English titles, exact fix
-instructions, file references.
-
-Response shape:
-    {
-        "generated_at":              str (ISO timestamp),
-        "threat_summary":            str (e.g. "3 active evasion patterns. 1 CRITICAL, 2 HIGH."),
-        "immediate_action_required": list[BriefingItem],   # CRITICAL + evasion_success=True
-        "monitor":                   list[BriefingItem],   # HIGH
-        "structural_findings":       list[BriefingItem],   # Structural evasion patterns identified — shadow scorer offline, severity unconfirmed. Review recommended.
-        "top_exploitable_features":  list[str],            # top-3 by frequency across KB
-        "context_multipliers_at_risk": list[str],          # e.g. ["festival_0.70x"]
-    }
-
-BriefingItem:
-    {
-        "priority":       int,
-        "severity":       str,
-        "title":          str,
-        "what_was_found": str,
-        "what_to_change": str,
-        "file":           str,
-        "evasion_ids":    list[str],
-    }
-
-Auth: X-API-Key (same as all other endpoints).
+Briefing Service — Data aggregation logic for GET /red-team/briefing
+=====================================================================
+Pure business logic, no FastAPI imports. Reads from kb_store and
+builds the full briefing dict consumed by the API route.
 """
 
 from __future__ import annotations
@@ -37,25 +11,16 @@ from collections import Counter
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends
-
 from app.knowledge.kb_store import get_all_evasions
-from app.utils.audit_logger import get_logger
-from app.utils.auth import require_api_key
+from app.core.utils.audit_logger import get_logger
 
 log = get_logger(__name__)
 
-router = APIRouter(
-    prefix="/red-team",
-    tags=["briefing"],
-)
-
 # ─────────────────────────────────────────────────────────────────────────────
-# Title / fix copy generators — plain English for each mutation/bypass type
+# Static lookup tables — mutation copy, file refs, intelligence
 # ─────────────────────────────────────────────────────────────────────────────
 
 _MUTATION_TITLES: dict[str, tuple[str, str, str]] = {
-    # (title, what_was_found, what_to_change)
     "threshold_amount_50k": (
         "Structuring below ₹50k threshold",
         "Feature amounts were reduced to 92% of the ₹50k threshold, dropping the fraud score below the BLOCK boundary.",
@@ -170,11 +135,11 @@ _CONTEXT_MULTIPLIER_LABELS: dict[str, str] = {
 
 _FEATURE_INTELLIGENCE: dict[str, tuple[str, str]] = {
     "velocity_ratio": (
-        "Reducing transaction velocity by 20-40% is the most common evasion technique in this archetype. Blue Team relies heavily on burst_score and velocity_ratio — an attacker slowing down slightly evades detection.",
+        "Reducing transaction velocity by 20-40% is the most common evasion technique in this archetype.",
         "Add rolling 7-day velocity baseline instead of point-in-time measurement",
     ),
     "burst_score": (
-        "Reducing transaction velocity by 20-40% is the most common evasion technique in this archetype. Blue Team relies heavily on burst_score and velocity_ratio — an attacker slowing down slightly evades detection.",
+        "Reducing transaction velocity by 20-40% is the most common evasion technique in this archetype.",
         "Add rolling 7-day velocity baseline instead of point-in-time measurement",
     ),
     "amount": (
@@ -194,7 +159,7 @@ _FEATURE_INTELLIGENCE: dict[str, tuple[str, str]] = {
 _MULTIPLIER_INTELLIGENCE: dict[str, tuple[float, str, str]] = {
     "is_festival_period": (
         0.70,
-        "Festival period multiplier (x0.70) was tested — flagging a digital_arrest transaction as festival-period reduces its score by 30%. Attackers could time fraud during Diwali/Holi.",
+        "Festival period multiplier (x0.70) was tested — flagging a digital_arrest transaction as festival-period reduces its score by 30%.",
         "Festival multiplier should not apply when payee_vpa_age_days < 7",
     ),
     "is_senior_account": (
@@ -204,46 +169,33 @@ _MULTIPLIER_INTELLIGENCE: dict[str, tuple[float, str, str]] = {
     ),
 }
 
-
 # ─────────────────────────────────────────────────────────────────────────────
-# Core briefing logic
+# Internal helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
 
 def _get_copy(mutation_type: str | None) -> tuple[str, str, str]:
-    """Return (title, what_was_found, what_to_change) for a mutation_type."""
     if not mutation_type:
         return _UNKNOWN_TITLE
     copy = _MUTATION_TITLES.get(mutation_type) or _GRAPH_TITLES.get(mutation_type)
     return copy if copy else _UNKNOWN_TITLE
 
 
-def _build_briefing_item(
-    priority: int,
-    evasion: dict[str, Any],
-) -> dict[str, Any]:
-    """Build a single BriefingItem from an evasion_kb row."""
-    mutation_type: str | None = evasion.get("mutation_type")
-    severity: str = evasion.get("severity", "LOW")
-    title, what_was_found, what_to_change = _get_copy(mutation_type)
-    file_ref = _BLUE_TEAM_FILES.get(mutation_type or "", "blue_team/ (review manually)")
-
+def _build_item(priority: int, evasion: dict[str, Any]) -> dict[str, Any]:
+    mt = evasion.get("mutation_type")
+    title, found, change = _get_copy(mt)
     return {
         "priority": priority,
-        "severity": severity,
+        "severity": evasion.get("severity", "LOW"),
         "title": title,
-        "what_was_found": what_was_found,
-        "what_to_change": what_to_change,
-        "file": file_ref,
+        "what_was_found": found,
+        "what_to_change": change,
+        "file": _BLUE_TEAM_FILES.get(mt or "", "blue_team/ (review manually)"),
         "evasion_ids": [evasion["id"]],
     }
 
 
 def _merge_by_title(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """
-    Merge BriefingItems that share the same title (same root cause).
-    Merged items accumulate all evasion_ids and take the lowest priority number.
-    """
     seen: dict[str, dict[str, Any]] = {}
     for item in items:
         key = item["title"]
@@ -251,7 +203,6 @@ def _merge_by_title(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
             seen[key] = dict(item)
         else:
             seen[key]["evasion_ids"].extend(item["evasion_ids"])
-    # Re-number priorities
     result = list(seen.values())
     for i, item in enumerate(result, start=1):
         item["priority"] = i
@@ -259,7 +210,6 @@ def _merge_by_title(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _build_mutation_intelligence(all_evasions: list[dict[str, Any]]) -> dict[str, Any]:
-    """Build the structural intelligence layer that runs regardless of shadow scorer status."""
     feature_stats: dict[str, list[float]] = {}
     multiplier_stats: dict[str, int] = {}
     archetypes: set[str] = set()
@@ -268,75 +218,60 @@ def _build_mutation_intelligence(all_evasions: list[dict[str, Any]]) -> dict[str
     for ev in all_evasions:
         if ev.get("mutation_type"):
             total_mutations += 1
-
         arch = ev.get("archetype")
         if arch and arch != "UNKNOWN":
             archetypes.add(arch)
-
-        # Features
         fs = ev.get("feature_sensitivity_result")
         if isinstance(fs, dict):
-            for feat_item in fs.get("top_5_exploitable_features", []):
-                feat = feat_item.get("feature")
-                delta = feat_item.get("delta_value")
+            for fi in fs.get("top_5_exploitable_features", []):
+                feat, delta = fi.get("feature"), fi.get("delta_value")
                 if feat and delta is not None:
-                    if feat not in feature_stats:
-                        feature_stats[feat] = []
-                    feature_stats[feat].append(float(delta))
-
-        # Multipliers
-        ctx = ev.get("context_bypass_result")
-        if isinstance(ctx, dict):
-            abused = ctx.get("multiplier_abused")
+                    feature_stats.setdefault(feat, []).append(float(delta))
+        for src in [ev.get("context_bypass_result", {}) or {}, ev]:
+            abused = src.get("multiplier_abused") if isinstance(src, dict) else None
             if abused:
                 multiplier_stats[abused] = multiplier_stats.get(abused, 0) + 1
-        direct_abused = ev.get("context_multiplier_abused")
-        if direct_abused:
-            multiplier_stats[direct_abused] = multiplier_stats.get(direct_abused, 0) + 1
+        direct = ev.get("context_multiplier_abused")
+        if direct:
+            multiplier_stats[direct] = multiplier_stats.get(direct, 0) + 1
 
-    # Format top features
-    top_features_list = []
-    sorted_features = sorted(feature_stats.items(), key=lambda x: len(x[1]), reverse=True)
-    for feat, deltas in sorted_features:
+    top_features = []
+    for feat, deltas in sorted(feature_stats.items(), key=lambda x: -len(x[1])):
         pe, rec = _FEATURE_INTELLIGENCE.get(feat, ("Unknown evasion technique.", "Review manually."))
-        avg_delta = sum(deltas) / len(deltas) if deltas else 0.0
-        top_features_list.append({
+        top_features.append({
             "feature": feat,
             "times_exploited": len(deltas),
-            "avg_delta": round(avg_delta, 2),
+            "avg_delta": round(sum(deltas) / len(deltas), 2) if deltas else 0.0,
             "plain_english": pe,
             "recommendation": rec,
         })
 
-    # Format multipliers
     multipliers_list = []
     for mult, count in multiplier_stats.items():
         val, pe, rec = _MULTIPLIER_INTELLIGENCE.get(mult, (1.0, "Unknown multiplier.", "Review manually."))
-        multipliers_list.append({
-            "multiplier": mult,
-            "multiplier_value": val,
-            "times_tested": count,
-            "plain_english": pe,
-            "recommendation": rec,
-        })
+        multipliers_list.append({"multiplier": mult, "multiplier_value": val,
+                                  "times_tested": count, "plain_english": pe, "recommendation": rec})
 
-    primary_archetype = list(archetypes)[0] if archetypes else "digital_arrest"
-    
-    # Check if shadow scorer was offline for all records
     scorer_offline = len(all_evasions) > 0 and all(ev.get("score_mutated") is None for ev in all_evasions)
-    summary = "Shadow scorer offline — showing structural analysis only" if scorer_offline else "Structural analysis generated from mutated payloads"
+    summary = ("Shadow scorer offline — showing structural analysis only" if scorer_offline
+               else "Structural analysis generated from mutated payloads")
     if not all_evasions:
         summary = "No evasion data available"
 
     return {
         "summary": summary,
-        "top_exploitable_features": top_features_list[:3],
+        "top_exploitable_features": top_features[:3],
         "context_multipliers_tested": multipliers_list,
-        "archetype_confirmed": primary_archetype,
+        "archetype_confirmed": list(archetypes)[0] if archetypes else "digital_arrest",
         "mutations_generated": total_mutations,
         "tgep_test_suggested": True,
         "tgep_payload_hint": "Use timing_day mutation vector for TGEP testing — shifts night_txn_ratio to 0.15 while keeping all other fraud signals intact",
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Public API
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 def build_briefing() -> dict[str, Any]:
@@ -352,61 +287,45 @@ def build_briefing() -> dict[str, Any]:
 
     for ev in all_evasions:
         severity = ev.get("severity", "LOW")
-        evasion_success = ev.get("evasion_success", False)
-
-        # Bucket by severity
-        item = _build_briefing_item(0, ev)   # priority set later by merge
-        if severity == "CRITICAL" and evasion_success:
+        item = _build_item(0, ev)
+        if severity == "CRITICAL" and ev.get("evasion_success", False):
             immediate.append(item)
         elif severity == "HIGH":
             monitor.append(item)
         else:
             structural_findings.append(item)
 
-        # Accumulate top exploitable features from feature_sensitivity_result
         fs = ev.get("feature_sensitivity_result")
         if isinstance(fs, dict):
-            for feat_item in fs.get("top_5_exploitable_features", []):
-                feat = feat_item.get("feature")
+            for fi in fs.get("top_5_exploitable_features", []):
+                feat = fi.get("feature")
                 if feat:
                     feature_counter[feat] += 1
 
-        # Accumulate context multipliers
         ctx = ev.get("context_bypass_result")
         if isinstance(ctx, dict):
             abused = ctx.get("multiplier_abused")
             if abused and _CONTEXT_MULTIPLIER_LABELS.get(abused):
                 multipliers_seen.add(_CONTEXT_MULTIPLIER_LABELS[abused])
-        # Also check direct field
-        direct_abused = ev.get("context_multiplier_abused")
-        if direct_abused and _CONTEXT_MULTIPLIER_LABELS.get(direct_abused):
-            multipliers_seen.add(_CONTEXT_MULTIPLIER_LABELS[direct_abused])
+        direct = ev.get("context_multiplier_abused")
+        if direct and _CONTEXT_MULTIPLIER_LABELS.get(direct):
+            multipliers_seen.add(_CONTEXT_MULTIPLIER_LABELS[direct])
 
-    # Merge duplicate titles and re-number
     immediate = _merge_by_title(immediate)
-    monitor   = _merge_by_title(monitor)
+    monitor = _merge_by_title(monitor)
     structural_findings = _merge_by_title(structural_findings)
 
-    # Build threat summary
-    n_critical = len(immediate)
-    n_high = len(monitor)
+    n_critical, n_high = len(immediate), len(monitor)
     total_patterns = n_critical + n_high + len(structural_findings)
     threat_summary = (
         f"{total_patterns} active evasion pattern{'s' if total_patterns != 1 else ''}. "
         f"{n_critical} CRITICAL, {n_high} HIGH."
     )
-
-    # Top exploitable features (top 3 by KB frequency)
     top_features = [feat for feat, _ in feature_counter.most_common(3)]
 
-    log.info(
-        "briefing_generated",
-        total_patterns=total_patterns,
-        immediate=n_critical,
-        monitor=n_high,
-        structural_findings=len(structural_findings),
-        top_features=top_features,
-    )
+    log.info("briefing_generated", total_patterns=total_patterns,
+             immediate=n_critical, monitor=n_high,
+             structural_findings=len(structural_findings), top_features=top_features)
 
     return {
         "generated_at": now,
@@ -418,37 +337,3 @@ def build_briefing() -> dict[str, Any]:
         "context_multipliers_at_risk": sorted(multipliers_seen),
         "mutation_intelligence": _build_mutation_intelligence(all_evasions),
     }
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Route
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-@router.get(
-    "/briefing",
-    summary="Red Team intelligence briefing for Blue Team developers",
-    response_description=(
-        "Human-readable JSON briefing: immediate actions, monitoring items, "
-        "top exploitable features, and context multiplier risks."
-    ),
-)
-async def get_briefing(
-    _key: str = Depends(require_api_key),
-) -> dict[str, Any]:
-    """
-    Return a single synthesised intelligence briefing from the entire evasion KB.
-
-    **Sections:**
-    - `immediate_action_required` — CRITICAL evasions with confirmed evasion_success.
-      Each item includes a plain-English title, what was found, what to change, and
-      which Blue Team file to edit.
-    - `monitor` — HIGH-severity evasions requiring attention but not immediate patching.
-    - `structural_findings` — Structural evasion patterns identified — shadow scorer offline, severity unconfirmed. Review recommended.
-    - `top_exploitable_features` — the 3 most frequently exploited features across all mutations.
-    - `context_multipliers_at_risk` — Indian context multipliers that were successfully abused.
-
-    **Golden invariant:** This endpoint returns developer intelligence only.
-    It does not trigger any automated action.
-    """
-    return build_briefing()

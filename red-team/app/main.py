@@ -23,20 +23,20 @@ from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from app.api import attack_graph as attack_graph_router
-from app.api import briefing as briefing_router
-from app.api import evasions as evasions_router
-from app.api import ingest as ingest_router
-from app.api import report as report_router
+from app.core.api import attack_graph as attack_graph_router
+from app.core.api import briefing as briefing_router
+from app.core.api import evasions as evasions_router
+from app.core.api import ingest as ingest_router
+from app.core.api import report as report_router
 from app.config import get_settings
-from app.utils.audit_logger import configure_logging, get_logger
-from app.utils.limiter import limiter
+from app.core.utils.audit_logger import configure_logging, get_logger
+from app.core.utils.limiter import limiter
 from app.worker.pipeline import worker_loop
 
 log = get_logger(__name__)
 
 
-# limiter is imported from app.utils.limiter — see that module for docs.
+# limiter is imported from app.core.utils.limiter — see that module for docs.
 
 
 # ─────────────────────────────────────────────────────────────────────────────

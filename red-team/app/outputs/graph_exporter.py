@@ -22,7 +22,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any
 
-from app.engines.tgep_bypass_graphs import VALID_BYPASS_TYPES, generate_tgep_bypass_graph
+from app.engines.graph_adversary import VALID_BYPASS_TYPES, generate_tgep_bypass_graph
 
 
 def _utcnow() -> datetime:

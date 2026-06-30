@@ -6,7 +6,7 @@ Key is read from RED_TEAM_API_KEY environment variable via Settings.
 Returns HTTP 403 on mismatch or missing header.
 
 Usage (in route file):
-    from app.utils.auth import require_api_key
+    from app.core.utils.auth import require_api_key
     router = APIRouter(dependencies=[Depends(require_api_key)])
 """
 
@@ -18,7 +18,7 @@ from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import APIKeyHeader
 
 from app.config import get_settings
-from app.utils.audit_logger import get_logger
+from app.core.utils.audit_logger import get_logger
 
 log = get_logger(__name__)
 

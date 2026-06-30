@@ -33,15 +33,15 @@ from typing import Any
 from app.engines.archetype_extractor import extract_archetype
 from app.engines.graph_adversary import VALID_GATES, generate_all_bypasses, generate_bypass
 from app.engines.mutation_engine import generate_mutations
-from app.engines.tgep_bypass_graphs import VALID_BYPASS_TYPES, generate_tgep_bypass_graph
-from app.ingest.router import _queues, get_ingest_log, update_ingest_status
+from app.engines.graph_adversary import VALID_BYPASS_TYPES, generate_tgep_bypass_graph
+from app.ingest.router import _queue, get_ingest_log, update_ingest_status
 from app.knowledge.kb_store import append_evasion, update_evasion_tgep_result
 from app.outputs.attack_package import build_attack_package, package_to_json_file
 from app.outputs.tgep_client import clear_tgep_graph, send_to_tgep
 from app.sandbox.evaluators import context_bypass, feature_sensitivity, gate_probe
 from app.sandbox.shadow_scorer import score_transaction
 from app.worker.pre_flight import pre_flight_tier_check
-from app.utils.audit_logger import get_logger
+from app.core.utils.audit_logger import get_logger
 
 log = get_logger(__name__)
 
@@ -93,28 +93,10 @@ async def worker_loop() -> None:
 
 async def _dequeue_next() -> dict[str, Any]:
     """
-    Wait until an item is available in any queue, honouring priority order.
-    Uses asyncio.wait with a 0-timeout peek on each queue before blocking
-    on the CRITICAL queue to avoid busy-polling on empty high-priority queues.
+    Wait until an item is available in the priority queue.
     """
-    while True:
-        # Try each queue in priority order (non-blocking)
-        for priority in _PRIORITY_ORDER:
-            q = _queues[priority]
-            try:
-                return q.get_nowait()
-            except asyncio.QueueEmpty:
-                continue
-        # All queues empty — block on CRITICAL until something arrives,
-        # then re-check all queues so we respect priority ordering.
-        # We use asyncio.wait_for with a short timeout so high-priority items
-        # that arrive while blocking on LOW aren't starved.
-        try:
-            item = await asyncio.wait_for(_queues["CRITICAL"].get(), timeout=0.05)
-            return item
-        except asyncio.TimeoutError:
-            # Give control back to the event loop briefly
-            await asyncio.sleep(0.01)
+    _, _, item = await _queue.get()
+    return item
 
 
 # ─────────────────────────────────────────────────────────────────────────────

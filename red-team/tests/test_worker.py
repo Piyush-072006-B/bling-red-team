@@ -18,7 +18,9 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.ingest.router import (
-    _queues,
+    _ingest_log,
+    _queue,
+    _seen_hashes,
     get_ingest_log,
     get_seen_hashes,
     reset_state,
@@ -364,7 +366,7 @@ class TestWorkerLoop:
             "payload": _FakeFraudDNA(),
             "enqueued_at": "2026-06-05T00:00:00Z",
         }
-        await _queues["HIGH"].put(queue_item)
+        await _queue.put((1, 0, queue_item))
 
         # Run the worker loop, cancel after a short timeout
         task = asyncio.create_task(worker_loop())
@@ -400,7 +402,7 @@ class TestWorkerLoop:
             "payload": _AnyPayload(),
             "enqueued_at": "2026-06-05T00:00:00Z",
         }
-        await _queues["HIGH"].put(queue_item)
+        await _queue.put((1, 0, queue_item))
 
         with patch(
             "app.worker.pipeline._pipeline_fraud_dna",

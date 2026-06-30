@@ -21,12 +21,12 @@ Returns:
 
 from __future__ import annotations
 
+import random
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from app.utils.audit_logger import get_logger
-from app.engines.tgep_bypass_graphs import generate_tgep_bypass_graph  # noqa: F401 re-export
+from app.core.utils.audit_logger import get_logger
 
 log = get_logger(__name__)
 
@@ -430,3 +430,137 @@ def generate_all_bypasses(
         generate_bypass(gate, transaction_data)
         for gate in sorted(VALID_GATES)
     ]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Isolation Forest Evasion (inlined from fingerprint_vary.py)
+# ─────────────────────────────────────────────────────────────────────────────
+
+_IF_STRUCTURAL_FEATURES = [
+    "pagerank_fraud_seeded", "betweenness_centrality", "clustering_coefficient",
+    "degree_centrality", "community_fraud_ratio", "shortest_path_to_fraud",
+    "cycle_membership", "sink_score", "bipartite_score", "fan_out_ratio",
+    "temporal_acceleration", "cash_mule_sink_score", "bridge_node_probability",
+    "dormancy_reactivation_flag", "account_age_days", "kyc_completeness_score",
+    "distinct_counterparties_30d",
+]
+_IF_UNBOUNDED = {"shortest_path_to_fraud", "account_age_days", "distinct_counterparties_30d"}
+
+
+def vary_structural_fingerprint(fv: dict[str, float]) -> dict[str, float]:
+    """Randomise 17 IF structural features by ±0.03–0.07 to evade Isolation Forest."""
+    for feat in _IF_STRUCTURAL_FEATURES:
+        if feat in fv:
+            offset = random.uniform(0.03, 0.07) * random.choice([1, -1])
+            val = fv[feat] + offset
+            fv[feat] = max(0.0, val) if feat in _IF_UNBOUNDED else max(0.0, min(1.0, val))
+    return fv
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TGEP Bypass Graphs (inlined from tgep_bypass_graphs.py)
+# ─────────────────────────────────────────────────────────────────────────────
+
+VALID_BYPASS_TYPES = frozenset({
+    "sink_with_outflow", "slow_bipartite", "nine_hop_linear", "mule_warmup_graph",
+})
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _bypass_edge(src: str, dst: str, amount: float, rail: str, ts: datetime) -> dict[str, Any]:
+    return {"from_account": src, "to_account": dst, "amount": amount,
+            "payment_rail": rail, "timestamp": ts.isoformat()}
+
+
+def _bypass_sink_with_outflow() -> list[dict[str, Any]]:
+    base, c = _now().replace(hour=10, minute=0, second=0), "ACC990477"
+    return [
+        _bypass_edge("CORP991", c, 300000, "RTGS", base),
+        _bypass_edge("CORP992", c, 450000, "RTGS", base + timedelta(days=1, hours=2)),
+        _bypass_edge("CORP993", c, 380000, "NEFT", base + timedelta(days=2, hours=1)),
+        _bypass_edge(c, "PAYROLL_VENDOR_994", 150000, "NEFT", base + timedelta(hours=4)),
+        _bypass_edge(c, "UTIL_PROVIDER_995", 35000, "UPI", base + timedelta(days=1, hours=5)),
+        _bypass_edge(c, "INVEST_FUND_996", 65000, "IMPS", base + timedelta(days=2, hours=3)),
+    ]
+
+
+def _bypass_slow_bipartite() -> list[dict[str, Any]]:
+    base, c = _now().replace(hour=10, minute=0, second=0), "ACC100588"
+    edges = [_bypass_edge(f"CORP{101+i}", c, a, r, base + timedelta(days=i, hours=2+(i % 3)))
+             for i, (a, r) in enumerate(zip([82000, 91000, 78000, 88000, 95000, 85000],
+                                            ["UPI", "IMPS", "NEFT", "UPI", "IMPS", "NEFT"]))]
+    for dst, amt, rail, d, h in [("PAYROLL_VENDOR_107", 110000, "NEFT", 1, 4),
+                                   ("VENDOR_108", 25000, "UPI", 3, 5),
+                                   ("INVEST_FUND_109", 40000, "IMPS", 5, 2)]:
+        edges.append(_bypass_edge(c, dst, amt, rail, base + timedelta(days=d, hours=h)))
+    return edges
+
+
+def _bypass_nine_hop_linear() -> list[dict[str, Any]]:
+    base, c = _now().replace(hour=11, minute=0, second=0), "ACC210699"
+    return [
+        _bypass_edge("CORP211", c, 200000, "NEFT", base),
+        _bypass_edge("CORP212", c, 180000, "RTGS", base + timedelta(days=1)),
+        _bypass_edge("CORP213", c, 250000, "IMPS", base + timedelta(days=2)),
+        _bypass_edge(c, "PAYROLL_VENDOR_214", 120000, "NEFT", base + timedelta(days=3)),
+        _bypass_edge(c, "VENDOR_215", 35000, "UPI", base + timedelta(days=3, hours=5)),
+        _bypass_edge(c, "UTIL_PROVIDER_216", 18000, "IMPS", base + timedelta(days=4)),
+    ]
+
+
+def _bypass_mule_warmup_graph() -> list[dict[str, Any]]:
+    base = _now().replace(hour=10, minute=0, second=0) - timedelta(days=30)
+    c, ci, oi = "ACC320711", 321, 340
+    edges: list[dict[str, Any]] = []
+    for i in range(3):
+        edges.append(_bypass_edge(f"CORP{ci}", c, 2000 + i * 1500, "UPI", base + timedelta(days=i, hours=11 + i)))
+        ci += 1
+    for i in range(2):
+        edges.append(_bypass_edge(c, f"VENDOR_{oi}", 1500 + i * 500, "UPI", base + timedelta(days=i + 1, hours=14 + i)))
+        oi += 1
+    for i in range(4):
+        edges.append(_bypass_edge(f"CORP{ci}", c, 5000 + i * 2500, "IMPS", base + timedelta(days=7 + i, hours=10 + i)))
+        ci += 1
+    for i in range(3):
+        edges.append(_bypass_edge(c, f"VENDOR_{oi}", 4000 + i * 1000, "UPI", base + timedelta(days=8 + i, hours=15 + i)))
+        oi += 1
+    for i in range(5):
+        edges.append(_bypass_edge(f"CORP{ci}", c, 10000 + i * 5000, "NEFT", base + timedelta(days=14 + i, hours=9 + i)))
+        ci += 1
+    for i in range(4):
+        edges.append(_bypass_edge(c, f"PAYROLL_VENDOR_{oi}", 8000 + i * 2000, "IMPS", base + timedelta(days=15 + i, hours=13 + i)))
+        oi += 1
+    sp = base + timedelta(days=25, hours=11)
+    edges += [
+        _bypass_edge(f"CORP{ci}", c, 850000, "RTGS", sp),
+        _bypass_edge(c, f"PAYROLL_VENDOR_{oi}", 150000, "NEFT", sp + timedelta(hours=4)),
+        _bypass_edge(c, f"UTIL_PROVIDER_{oi+1}", 35000, "UPI", sp + timedelta(hours=5)),
+        _bypass_edge(c, f"VENDOR_{oi+2}", 65000, "IMPS", sp + timedelta(hours=8)),
+        _bypass_edge(c, f"INVEST_FUND_{oi+3}", 45000, "RTGS", sp + timedelta(hours=10)),
+    ]
+    return edges
+
+
+_BYPASS_GENERATORS = {
+    "sink_with_outflow": _bypass_sink_with_outflow,
+    "slow_bipartite": _bypass_slow_bipartite,
+    "nine_hop_linear": _bypass_nine_hop_linear,
+    "mule_warmup_graph": _bypass_mule_warmup_graph,
+}
+
+
+def generate_tgep_bypass_graph(archetype: str, evasion_type: str) -> dict[str, Any]:
+    """Generate a TGEP bypass graph for the given evasion_type."""
+    if evasion_type not in VALID_BYPASS_TYPES:
+        raise ValueError(f"Unknown evasion_type '{evasion_type}'. Valid: {sorted(VALID_BYPASS_TYPES)}")
+    edges = _BYPASS_GENERATORS[evasion_type]()
+    return {
+        "evasion_type": evasion_type,
+        "archetype": archetype,
+        "edges": edges,
+        "edge_count": len(edges),
+        "mutation_type": f"graph_bypass_{evasion_type}",
+    }

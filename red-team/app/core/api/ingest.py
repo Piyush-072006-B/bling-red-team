@@ -14,9 +14,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from app.config import get_settings
 from app.ingest.router import DuplicateIngestError, QueueFullError, ingest_signal
 from app.ingest.schemas import IngestPayload
-from app.utils.audit_logger import get_logger
-from app.utils.auth import require_api_key
-from app.utils.limiter import limiter
+from app.core.utils.audit_logger import get_logger
+from app.core.utils.auth import require_api_key
+from app.core.utils.limiter import limiter
 
 log = get_logger(__name__)
 

@@ -15,7 +15,7 @@ from typing import Any
 
 from app.config import get_settings
 from app.engines.seed_library import get_all_seeds, get_seed_with_variation
-from app.utils.audit_logger import get_logger
+from app.core.utils.audit_logger import get_logger
 
 log = get_logger(__name__)
 
@@ -25,7 +25,7 @@ async def run_self_generation_cycle(n_archetypes: int = 3) -> list[str]:
 
     Returns list of ingest_ids created.
     """
-    from app.ingest.router import _queues, ingest_signal
+    from app.ingest.router import ingest_signal
     from app.ingest.schemas import FraudDNA
 
     all_archetypes = list(get_all_seeds().keys())
@@ -89,8 +89,8 @@ async def start_self_generation_loop(
     while True:
         try:
             # Backpressure — check total queue depth
-            from app.ingest.router import _queues
-            total_pending = sum(q.qsize() for q in _queues.values())
+            from app.ingest.router import _queue
+            total_pending = _queue.qsize()
             if total_pending > 50:
                 log.info("self_gen_backpressure", pending=total_pending)
             else:

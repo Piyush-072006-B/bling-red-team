@@ -13,8 +13,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.ingest.router import get_ingest_log
 from app.knowledge.kb_store import query_evasions
-from app.utils.audit_logger import get_logger
-from app.utils.auth import require_api_key
+from app.core.utils.audit_logger import get_logger
+from app.core.utils.auth import require_api_key
 
 log = get_logger(__name__)
 

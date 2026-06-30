@@ -6,7 +6,7 @@ Provides a single Limiter instance that can be imported by both app/main.py
 without creating circular imports.
 
 Usage in a route:
-    from app.utils.limiter import limiter
+    from app.core.utils.limiter import limiter
     @limiter.limit("500/minute")
     async def my_endpoint(request: Request, ...): ...
 """

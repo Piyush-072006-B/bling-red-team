@@ -21,11 +21,12 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import uuid
+import itertools
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from app.config import get_settings
-from app.utils.audit_logger import get_logger, hash_id
+from app.core.utils.audit_logger import get_logger, hash_id
 
 if TYPE_CHECKING:
     from app.ingest.schemas import FraudDNA, GateMissLog, IngestPayload, NoveltyEscalation
@@ -42,12 +43,9 @@ log = get_logger(__name__)
 #
 # Queue sizes are bounded by INGEST_QUEUE_MAX_SIZE (default 1000 per tier).
 # When a put_nowait() fails, ingest_signal raises QueueFullError -> HTTP 503.
-_queues: dict[str, asyncio.Queue] = {
-    "CRITICAL": asyncio.Queue(maxsize=get_settings().ingest_queue_max_size),
-    "HIGH":     asyncio.Queue(maxsize=get_settings().ingest_queue_max_size),
-    "MEDIUM":   asyncio.Queue(maxsize=get_settings().ingest_queue_max_size),
-    "LOW":      asyncio.Queue(maxsize=get_settings().ingest_queue_max_size),
-}
+_queue = asyncio.PriorityQueue(maxsize=get_settings().ingest_queue_max_size * 4)
+_queue_counter = itertools.count()
+_PRIORITY_MAP = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
 
 # In-memory dedup set (replaced by DB check when DB is available)
 # Maps transaction_id_hash → ingest_id
@@ -220,7 +218,7 @@ async def ingest_signal(payload: "IngestPayload") -> dict[str, str]:
         "enqueued_at": now.isoformat(),
     }
     try:
-        _queues[priority].put_nowait(queue_item)
+        _queue.put_nowait((_PRIORITY_MAP[priority], next(_queue_counter), queue_item))
     except asyncio.QueueFull:
         # Roll back the log entry and dedup hash so the caller can retry cleanly
         _ingest_log.remove(log_entry)
@@ -250,11 +248,6 @@ async def ingest_signal(payload: "IngestPayload") -> dict[str, str]:
     }
 
 
-def get_queue(priority: str) -> asyncio.Queue:
-    """Return the asyncio.Queue for the given priority tier."""
-    return _queues[priority]
-
-
 def get_ingest_log() -> list[dict[str, Any]]:
     """Return the in-memory ingest log (all entries). Used by tests and report endpoint."""
     return _ingest_log
@@ -272,12 +265,11 @@ def reset_state() -> None:
     """
     _ingest_log.clear()
     _seen_hashes.clear()
-    for q in _queues.values():
-        while not q.empty():
-            try:
-                q.get_nowait()
-            except asyncio.QueueEmpty:
-                break
+    while not _queue.empty():
+        try:
+            _queue.get_nowait()
+        except asyncio.QueueEmpty:
+            break
 
 
 def update_ingest_status(
